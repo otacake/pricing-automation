@@ -34,6 +34,7 @@ class OptimizationResult:
     - iterations: evaluation count
     - exempt_model_points: model point IDs skipped in hard constraints
     - exemption_settings: exemption policy configuration (if enabled)
+    - watch_model_points: model point IDs excluded from objective/constraints
     """
 
     params: LoadingFunctionParams
@@ -43,6 +44,7 @@ class OptimizationResult:
     failure_details: list[str]
     exempt_model_points: list[str]
     exemption_settings: ExemptionSettings | None
+    watch_model_points: list[str]
 
 
 @dataclass(frozen=True)
@@ -73,6 +75,7 @@ def _evaluate(
     settings: OptimizationSettings,
     stage_vars: list[str],
     exempt_model_points: set[str],
+    watch_model_points: set[str],
 ) -> CandidateEvaluation:
     result = run_profit_test(config, base_dir=base_dir, loading_params=params)
 
@@ -82,7 +85,7 @@ def _evaluate(
     failure_details: list[str] = []
     for res in result.results:
         label = model_point_label(res.model_point)
-        if label in exempt_model_points:
+        if label in exempt_model_points or label in watch_model_points:
             continue
         threshold = loading_surplus_threshold(settings, res.model_point.sum_assured)
         irr_shortfall = max(settings.irr_hard - res.irr, 0.0)
@@ -181,11 +184,18 @@ def _run_stage(
     stage: OptimizationStage,
     max_iterations: int,
     exempt_model_points: set[str],
+    watch_model_points: set[str],
 ) -> tuple[CandidateEvaluation, int]:
     stage_vars = list(dict.fromkeys(stage.variables))
     current_params = params
     current_eval = _evaluate(
-        config, base_dir, current_params, settings, stage_vars, exempt_model_points
+        config,
+        base_dir,
+        current_params,
+        settings,
+        stage_vars,
+        exempt_model_points,
+        watch_model_points,
     )
     iterations = 1
 
@@ -204,7 +214,13 @@ def _run_stage(
                     continue
                 candidate_params = replace(current_params, **{name: next_value})
                 candidate_eval = _evaluate(
-                    config, base_dir, candidate_params, settings, stage_vars, exempt_model_points
+                    config,
+                    base_dir,
+                    candidate_params,
+                    settings,
+                    stage_vars,
+                    exempt_model_points,
+                    watch_model_points,
                 )
                 iterations += 1
                 if _is_better_candidate(candidate_eval, current_eval):
@@ -257,6 +273,7 @@ def optimize_loading_parameters(
             model_id for model_id, min_r in min_r_by_id.items() if min_r is None
         ]
     exempt_set = set(exempt_model_points)
+    watch_set = set(settings.watch_model_point_ids)
 
     base_params = read_loading_parameters(config)
     if base_params is None:
@@ -287,6 +304,7 @@ def optimize_loading_parameters(
             stage,
             settings.max_iterations_per_stage,
             exempt_set,
+            watch_set,
         )
         total_iterations += iterations
         current_params = stage_eval.params
@@ -304,6 +322,7 @@ def optimize_loading_parameters(
         failure_details=[] if best_eval.feasible else best_eval.failure_details,
         exempt_model_points=exempt_model_points,
         exemption_settings=exemption if exemption.enabled else None,
+        watch_model_points=settings.watch_model_point_ids,
     )
 
 

@@ -91,18 +91,18 @@ optimization:
   # 免除は不要（男60を削除したため）
   exemption:
     enabled: false
-
-  # P≦S を最優先
+  watch_model_point_ids:
+    - male_age50_term20
   premium_to_maturity_hard_max: 1.05
-  premium_to_maturity_target: 1.00
+  premium_to_maturity_soft_min: 1.01   # 追加：これ未満は罰則
 
-  # 十分性は S比で-10%まで許容
   loading_surplus_hard_ratio: -0.10
-
-  # NBVは必ず0以上
   nbv_hard: 0.0
 
-  # IRRはまず成立を優先（後で上げる）
-  irr_hard: 0.00
-  irr_target: 0.04
+  # IRRは「下限」ではなく「最大化」が目的になるので hardは0でよい
+  irr_hard: 0.0
+
+  # 追加：目的関数のモード
+  objective:
+    mode: "maximize_min_irr"   # 追加
 

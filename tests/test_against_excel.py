@@ -201,14 +201,27 @@ def test_profit_test_against_excel() -> None:
     wb = _load_workbook_or_skip()
     try:
         ws_profit = _get_sheet(wb, "収益性検証")
+        ws_master = _get_sheet(wb, "マスタ")
         expected_irr = _require_float(ws_profit["B1"].value, "IRR")
         expected_nbv = _require_float(ws_profit["C3"].value, "new business value")
+        issue_age = _require_int(ws_master["C2"].value, "issue age")
+        sex = _sex_from_master(ws_master["C3"].value)
+        term_years = _require_int(ws_master["C4"].value, "term years")
+        premium_paying_years = _require_int(ws_master["C5"].value, "premium paying years")
+        sum_assured = _require_int(ws_master["C6"].value, "sum assured")
     finally:
         wb.close()
 
     config_path = REPO_ROOT / "configs" / "trial-001.yaml"
     config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
     config.pop("model_points", None)
+    config["model_point"] = {
+        "issue_age": issue_age,
+        "sex": sex,
+        "term_years": term_years,
+        "premium_paying_years": premium_paying_years,
+        "sum_assured": sum_assured,
+    }
     profit_test_cfg = dict(config.get("profit_test", {}))
     profit_test_cfg["expense_model"] = {"mode": "loading"}
     config["profit_test"] = profit_test_cfg

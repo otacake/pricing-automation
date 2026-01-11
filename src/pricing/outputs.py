@@ -153,6 +153,10 @@ def write_optimize_log(
         f"g_term: {result.params.g_term}",
     ]
 
+    if result.watch_model_points is not None:
+        watch_ids = result.watch_model_points
+        lines.append(f"watch_list: {', '.join(watch_ids) if watch_ids else 'none'}")
+
     if result.exempt_model_points is not None:
         exempt_ids = result.exempt_model_points
         lines.append(f"exempt_list: {', '.join(exempt_ids) if exempt_ids else 'none'}")
@@ -175,6 +179,21 @@ def write_optimize_log(
             lines.append(
                 f"{label} status=exempt"
             )
+            continue
+        if label in result.watch_model_points:
+            threshold = loading_surplus_threshold(settings, int(row.sum_assured))
+            loading_ratio = row.loading_surplus / float(row.sum_assured)
+            lines.append(
+                f"{label} irr={row.irr} "
+                f"nbv={row.new_business_value} "
+                f"loading_surplus={row.loading_surplus} "
+                f"premium_to_maturity={row.premium_to_maturity_ratio} "
+                f"loading_surplus_threshold={threshold} "
+                f"loading_surplus_ratio={loading_ratio} "
+                f"status=watch"
+            )
+            if row.premium_to_maturity_ratio > 1.0:
+                lines.append(f"warning: premium_total_exceeds_maturity {label}")
             continue
         threshold = loading_surplus_threshold(settings, int(row.sum_assured))
         loading_ratio = row.loading_surplus / float(row.sum_assured)

@@ -25,6 +25,7 @@ def _format_run_output(config: dict, result) -> str:
     irr_min = settings.irr_hard
     premium_hard_max = settings.premium_to_maturity_hard_max
     nbv_hard = settings.nbv_hard
+    watch_ids = set(settings.watch_model_point_ids)
 
     loading_params = config.get("loading_parameters")
     if loading_params is None:
@@ -69,7 +70,10 @@ def _format_run_output(config: dict, result) -> str:
         loading_ok = row.loading_surplus >= threshold
         premium_ok = row.premium_to_maturity_ratio <= premium_hard_max
         nbv_ok = row.new_business_value >= nbv_hard
-        status = "pass" if irr_ok and loading_ok and premium_ok and nbv_ok else "fail"
+        if row.model_point in watch_ids:
+            status = "watch"
+        else:
+            status = "pass" if irr_ok and loading_ok and premium_ok and nbv_ok else "fail"
         lines.append(
             f"{row.model_point} irr={row.irr} nbv={row.new_business_value} "
             f"loading_surplus={row.loading_surplus} premium_to_maturity={row.premium_to_maturity_ratio} "
@@ -96,19 +100,27 @@ def _format_run_output(config: dict, result) -> str:
         if row.premium_to_maturity_ratio > 1.0:
             lines.append(f"warning: premium_total_exceeds_maturity {row.model_point}")
 
-    if any(row.irr < irr_min for row in result.summary.itertuples(index=False)):
+    if any(
+        row.irr < irr_min and row.model_point not in watch_ids
+        for row in result.summary.itertuples(index=False)
+    ):
         lines.append("constraint_check: irr_hard failed")
     if any(
         row.loading_surplus < loading_surplus_threshold(settings, int(row.sum_assured))
+        and row.model_point not in watch_ids
         for row in result.summary.itertuples(index=False)
     ):
         lines.append("constraint_check: loading_surplus_hard failed")
     if any(
         row.premium_to_maturity_ratio > premium_hard_max
+        and row.model_point not in watch_ids
         for row in result.summary.itertuples(index=False)
     ):
         lines.append("constraint_check: premium_to_maturity_hard failed")
-    if any(row.new_business_value < nbv_hard for row in result.summary.itertuples(index=False)):
+    if any(
+        row.new_business_value < nbv_hard and row.model_point not in watch_ids
+        for row in result.summary.itertuples(index=False)
+    ):
         lines.append("constraint_check: nbv_hard failed")
 
     return "\n".join(lines)

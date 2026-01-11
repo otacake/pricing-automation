@@ -113,6 +113,7 @@ class OptimizationSettings:
     - nbv_hard: JPY
     - l2_lambda: weight for L2 regularization
     - max_iterations_per_stage: iteration count
+    - watch_model_point_ids: model points excluded from objective/constraints
     """
 
     irr_hard: float
@@ -126,6 +127,7 @@ class OptimizationSettings:
     bounds: dict[str, OptimizationBounds]
     l2_lambda: float
     max_iterations_per_stage: int
+    watch_model_point_ids: list[str]
 
 
 @dataclass(frozen=True)
@@ -173,6 +175,7 @@ def load_optimization_settings(config: Mapping[str, object]) -> OptimizationSett
         "nbv_hard": 0.0,
         "l2_lambda": 0.1,
         "max_iterations_per_stage": 5000,
+        "watch_model_point_ids": [],
     }
 
     constraints_cfg = config.get("constraints", {}) if isinstance(config, Mapping) else {}
@@ -202,6 +205,11 @@ def load_optimization_settings(config: Mapping[str, object]) -> OptimizationSett
     max_iterations_per_stage = optimization_cfg.get(
         "max_iterations_per_stage", defaults["max_iterations_per_stage"]
     )
+    watch_ids = optimization_cfg.get(
+        "watch_model_point_ids", defaults["watch_model_point_ids"]
+    )
+    if not isinstance(watch_ids, Sequence) or isinstance(watch_ids, (str, bytes)):
+        watch_ids = []
 
     stage_defs = optimization_cfg.get("stages")
     if not isinstance(stage_defs, Sequence):
@@ -292,6 +300,7 @@ def load_optimization_settings(config: Mapping[str, object]) -> OptimizationSett
         bounds=bounds,
         l2_lambda=float(l2_lambda),
         max_iterations_per_stage=int(max_iterations_per_stage),
+        watch_model_point_ids=[str(item) for item in watch_ids],
     )
 
 
