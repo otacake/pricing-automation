@@ -11,6 +11,7 @@ out/
 dist/
 build/
 *.log
+!out/.gitkeep
 
 # Data (原則として雛形のみ追跡)
 data/
