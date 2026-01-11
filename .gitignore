@@ -1,0 +1,31 @@
+﻿# Python
+__pycache__/
+*.pyc
+.venv/
+.venv*/
+.conda/
+.pytest_cache/
+
+# Outputs
+out/
+dist/
+build/
+*.log
+
+# Data (原則として雛形のみ追跡)
+data/
+!data/README.md
+!data/golden/
+!data/golden/README.md
+
+# Excel / Office
+*.xlsx
+*.xlsm
+*.xls
+*.pptx
+*.pdf
+
+# OS / Editor
+.DS_Store
+.vscode/
+.idea/
