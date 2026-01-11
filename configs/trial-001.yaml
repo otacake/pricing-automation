@@ -13,6 +13,64 @@ model_point:
   issue_age: 37
   sex: "male"
 
+model_points:
+  - id: male_age30_term35
+    sex: male
+    issue_age: 30
+    term_years: 35
+    premium_paying_years: 35
+    sum_assured: 3000000
+
+  - id: male_age40_term25
+    sex: male
+    issue_age: 40
+    term_years: 25
+    premium_paying_years: 25
+    sum_assured: 3000000
+
+  - id: male_age50_term20
+    sex: male
+    issue_age: 50
+    term_years: 20
+    premium_paying_years: 20
+    sum_assured: 3000000
+
+  - id: male_age60_term10
+    sex: male
+    issue_age: 60
+    term_years: 10
+    premium_paying_years: 10
+    sum_assured: 3000000
+
+  - id: female_age30_term35
+    sex: female
+    issue_age: 30
+    term_years: 35
+    premium_paying_years: 35
+    sum_assured: 3000000
+
+  - id: female_age40_term25
+    sex: female
+    issue_age: 40
+    term_years: 25
+    premium_paying_years: 25
+    sum_assured: 3000000
+
+  - id: female_age50_term20
+    sex: female
+    issue_age: 50
+    term_years: 20
+    premium_paying_years: 20
+    sum_assured: 3000000
+
+  - id: female_age60_term10
+    sex: female
+    issue_age: 60
+    term_years: 10
+    premium_paying_years: 10
+    sum_assured: 3000000
+
+
 pricing:
   interest:
     type: "flat"
