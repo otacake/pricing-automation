@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations  # 型注釈の前方参照を許可し、循環参照を避けるため
 
 """
 仮想会社データ（company_expense.csv）を再現性つきで生成するモジュール。
@@ -27,15 +27,15 @@
 - 配賦比率は configs/*.yaml で指定する（例：共通費を獲得:50%・維持:50% など）。
 """
 
-from dataclasses import dataclass
-from pathlib import Path
+from dataclasses import dataclass  # 入力パラメータを構造化するため
+from pathlib import Path  # ファイルパスをOS非依存で扱うため
 
-import numpy as np
-import pandas as pd
+import numpy as np  # 乱数と配列計算に使うため
+import pandas as pd  # データフレーム作成に使うため
 
 
-@dataclass(frozen=True)
-class VirtualCompanySpec:
+@dataclass(frozen=True)  # 入力パラメータを不変で扱うため
+class VirtualCompanySpec:  # 仮想会社データの前提条件をまとめる
     """
     仮想会社生成の入力パラメータ。
 
@@ -49,41 +49,41 @@ class VirtualCompanySpec:
     - coll_rate は「集金費総額 / 保険料収入総額」の比率を想定する。
     """
 
-    start_year: int = 2025
-    years: int = 5
+    start_year: int = 2025  # 開始年
+    years: int = 5  # 生成する年数
 
     # 規模（初年度）
-    new_policies_0: int = 12_000
-    inforce_avg_0: int = 90_000
-    premium_income_0: int = 72_000_000_000  # 円
+    new_policies_0: int = 12_000  # 初年度の新契約件数
+    inforce_avg_0: int = 90_000  # 初年度の平均保有件数
+    premium_income_0: int = 72_000_000_000  # 初年度の保険料収入総額（円）
 
     # 年成長率（決定論）
-    new_policies_growth: float = 0.03
-    inforce_growth: float = 0.02
-    premium_income_growth: float = 0.03
+    new_policies_growth: float = 0.03  # 新契約件数の年成長率
+    inforce_growth: float = 0.02  # 保有件数の年成長率
+    premium_income_growth: float = 0.03  # 保険料収入の年成長率
 
     # 単価・率（初年度）
-    acq_var_per_policy: int = 150_000      # 円 / 新契約
-    acq_fixed_total: int = 600_000_000     # 円 / 年
-    maint_var_per_inforce: int = 10_000    # 円 / 保有（平均）
-    maint_fixed_total: int = 500_000_000   # 円 / 年
-    coll_rate: float = 0.003               # 集金費 / 保険料収入
-    overhead_total: int = 400_000_000      # 円 / 年
+    acq_var_per_policy: int = 150_000  # 獲得変動費（円/新契約）
+    acq_fixed_total: int = 600_000_000  # 獲得固定費（円/年）
+    maint_var_per_inforce: int = 10_000  # 維持変動費（円/保有）
+    maint_fixed_total: int = 500_000_000  # 維持固定費（円/年）
+    coll_rate: float = 0.003  # 集金費率（保険料収入比）
+    overhead_total: int = 400_000_000  # 共通費（円/年）
 
     # ノイズ（費用総額へ乗算）
-    noise_sd_ratio: float = 0.02
+    noise_sd_ratio: float = 0.02  # 乱数ノイズの標準偏差比率
 
 
-def _noisy(rng: np.random.Generator, x: int, sd_ratio: float) -> int:
+def _noisy(rng: np.random.Generator, x: int, sd_ratio: float) -> int:  # 乱数ノイズを付与して整数に丸める
     """
     乗算ノイズ（1 + 正規ノイズ）を適用し、整数円へ丸める。
     - sd_ratio は標準偏差（比率）であり、0.02 は 2% 程度の揺らぎを意味する。
     """
-    z = rng.normal(loc=0.0, scale=sd_ratio)
-    return int(round(x * (1.0 + z)))
+    z = rng.normal(loc=0.0, scale=sd_ratio)  # 正規乱数を生成する
+    return int(round(x * (1.0 + z)))  # 乗算ノイズを適用して円単位に丸める
 
 
-def generate_company_expense_df(seed: int, spec: VirtualCompanySpec) -> pd.DataFrame:
+def generate_company_expense_df(seed: int, spec: VirtualCompanySpec) -> pd.DataFrame:  # 仮想会社データを生成する
     """
     仮想会社の年次データフレームを生成する。
 
@@ -97,53 +97,53 @@ def generate_company_expense_df(seed: int, spec: VirtualCompanySpec) -> pd.DataF
     - coll_var_total
     - overhead_total
     """
-    rng = np.random.default_rng(seed)
-    years = [spec.start_year + i for i in range(spec.years)]
+    rng = np.random.default_rng(seed)  # 再現性のある乱数生成器を作る
+    years = [spec.start_year + i for i in range(spec.years)]  # 年の配列を作る
 
     # 規模系列（決定論で生成）
-    new_policies = [int(round(spec.new_policies_0 * (1.0 + spec.new_policies_growth) ** i)) for i in range(spec.years)]
-    inforce_avg = [int(round(spec.inforce_avg_0 * (1.0 + spec.inforce_growth) ** i)) for i in range(spec.years)]
-    premium_income = [int(round(spec.premium_income_0 * (1.0 + spec.premium_income_growth) ** i)) for i in range(spec.years)]
+    new_policies = [int(round(spec.new_policies_0 * (1.0 + spec.new_policies_growth) ** i)) for i in range(spec.years)]  # 新契約件数系列
+    inforce_avg = [int(round(spec.inforce_avg_0 * (1.0 + spec.inforce_growth) ** i)) for i in range(spec.years)]  # 保有件数系列
+    premium_income = [int(round(spec.premium_income_0 * (1.0 + spec.premium_income_growth) ** i)) for i in range(spec.years)]  # 収入系列
 
     # 変動費（総額）を構成し、微小ノイズを付与する
-    acq_var_total = [
+    acq_var_total = [  # 獲得変動費の系列
         _noisy(rng, spec.acq_var_per_policy * new_policies[i], spec.noise_sd_ratio) for i in range(spec.years)
     ]
-    maint_var_total = [
+    maint_var_total = [  # 維持変動費の系列
         _noisy(rng, spec.maint_var_per_inforce * inforce_avg[i], spec.noise_sd_ratio) for i in range(spec.years)
     ]
-    coll_var_total = [
+    coll_var_total = [  # 集金変動費の系列
         _noisy(rng, int(round(spec.coll_rate * premium_income[i])), spec.noise_sd_ratio) for i in range(spec.years)
     ]
-    overhead_total = [
+    overhead_total = [  # 共通費の系列
         _noisy(rng, spec.overhead_total, spec.noise_sd_ratio) for _ in range(spec.years)
     ]
 
     # 固定費は初期実装として年次一定とする（後で成長率等を追加可能）
-    df = pd.DataFrame(
+    df = pd.DataFrame(  # 生成した系列をデータフレームにまとめる
         {
-            "year": years,
-            "new_policies": new_policies,
-            "inforce_avg": inforce_avg,
-            "premium_income": premium_income,
-            "acq_var_total": acq_var_total,
-            "acq_fixed_total": [spec.acq_fixed_total] * spec.years,
-            "maint_var_total": maint_var_total,
-            "maint_fixed_total": [spec.maint_fixed_total] * spec.years,
-            "coll_var_total": coll_var_total,
-            "overhead_total": overhead_total,
+            "year": years,  # 年
+            "new_policies": new_policies,  # 新契約件数
+            "inforce_avg": inforce_avg,  # 平均保有件数
+            "premium_income": premium_income,  # 保険料収入
+            "acq_var_total": acq_var_total,  # 獲得変動費
+            "acq_fixed_total": [spec.acq_fixed_total] * spec.years,  # 獲得固定費
+            "maint_var_total": maint_var_total,  # 維持変動費
+            "maint_fixed_total": [spec.maint_fixed_total] * spec.years,  # 維持固定費
+            "coll_var_total": coll_var_total,  # 集金変動費
+            "overhead_total": overhead_total,  # 共通費
         }
-    )
-    return df
+    )  # データフレーム作成
+    return df  # データフレームを返す
 
 
-def write_company_expense_csv(path: str | Path, seed: int, spec: VirtualCompanySpec) -> Path:
+def write_company_expense_csv(path: str | Path, seed: int, spec: VirtualCompanySpec) -> Path:  # CSVとして保存する
     """
     CSVとして保存する。
     - data/ は .gitignore で追跡対象外にする運用を想定する（実データ混入を防止するため）。
     """
-    out_path = Path(path)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    df = generate_company_expense_df(seed=seed, spec=spec)
-    df.to_csv(out_path, index=False, encoding="utf-8")
-    return out_path
+    out_path = Path(path)  # 文字列をPathに変換する
+    out_path.parent.mkdir(parents=True, exist_ok=True)  # 出力先ディレクトリを作る
+    df = generate_company_expense_df(seed=seed, spec=spec)  # データフレームを生成する
+    df.to_csv(out_path, index=False, encoding="utf-8")  # CSVとして保存する
+    return out_path  # 保存先を返す

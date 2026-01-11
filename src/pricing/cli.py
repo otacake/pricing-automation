@@ -1,298 +1,298 @@
-from __future__ import annotations
+from __future__ import annotations  # 型注釈の前方参照を許可して循環参照を避けるため
 
 """
 CLI entrypoint for pricing automation.
 """
 
-import argparse
-from pathlib import Path
+import argparse  # CLI引数を扱うため
+from pathlib import Path  # パスをOSに依存せず扱うため
 
-import yaml
+import yaml  # YAML設定を読み込むため
 
-from .config import load_optimization_settings, loading_surplus_threshold, read_loading_parameters
-from .optimize import optimize_loading_parameters, write_optimized_config
-from .outputs import write_optimize_log, write_profit_test_excel, write_profit_test_log
-from .profit_test import run_profit_test
-from .sweep_ptm import sweep_premium_to_maturity, sweep_premium_to_maturity_all
-
-
-def _load_config(path: Path) -> dict:
-    return yaml.safe_load(path.read_text(encoding="utf-8"))
+from .config import load_optimization_settings, loading_surplus_threshold, read_loading_parameters  # 設定値の解釈に使うため
+from .optimize import optimize_loading_parameters, write_optimized_config  # 最適化の実行と結果保存に使うため
+from .outputs import write_optimize_log, write_profit_test_excel, write_profit_test_log  # 出力ファイル生成に使うため
+from .profit_test import run_profit_test  # 収益性検証の本体を呼び出すため
+from .sweep_ptm import sweep_premium_to_maturity, sweep_premium_to_maturity_all  # premium-to-maturityのスイープ処理を呼ぶため
 
 
-def _format_run_output(config: dict, result) -> str:
-    settings = load_optimization_settings(config)
-    irr_min = settings.irr_hard
-    premium_hard_max = settings.premium_to_maturity_hard_max
-    nbv_hard = settings.nbv_hard
-    watch_ids = set(settings.watch_model_point_ids)
+def _load_config(path: Path) -> dict:  # YAMLを読み込んで辞書に変換する補助関数
+    return yaml.safe_load(path.read_text(encoding="utf-8"))  # ファイルをUTF-8で読み、YAMLを安全にパースする
 
-    loading_params = config.get("loading_parameters")
-    if loading_params is None:
-        params = read_loading_parameters(config)
-        if params is not None:
-            loading_params = {
-                "a0": params.a0,
-                "a_age": params.a_age,
-                "a_term": params.a_term,
-                "a_sex": params.a_sex,
-                "b0": params.b0,
-                "b_age": params.b_age,
-                "b_term": params.b_term,
-                "b_sex": params.b_sex,
-                "g0": params.g0,
-                "g_term": params.g_term,
-            }
 
-    lines = ["run"]
-    if loading_params:
-        lines.append("loading_parameters")
-        for key in [
-            "a0",
-            "a_age",
-            "a_term",
-            "a_sex",
-            "b0",
-            "b_age",
-            "b_term",
-            "b_sex",
-            "g0",
-            "g_term",
-        ]:
-            if key in loading_params:
-                lines.append(f"{key}: {loading_params[key]}")
+def _format_run_output(config: dict, result) -> str:  # run結果を人が読みやすいテキストに整形する
+    settings = load_optimization_settings(config)  # 最適化設定から制約値を取得する
+    irr_min = settings.irr_hard  # IRRのハード下限を使う
+    premium_hard_max = settings.premium_to_maturity_hard_max  # premium-to-maturity上限を使う
+    nbv_hard = settings.nbv_hard  # NBVハード下限を使う
+    watch_ids = set(settings.watch_model_point_ids)  # 監視対象を集合で保持して検索を高速化する
 
-    lines.append("model_point_results")
-    for row in result.summary.itertuples(index=False):
-        threshold = loading_surplus_threshold(settings, int(row.sum_assured))
-        loading_ratio = row.loading_surplus / float(row.sum_assured)
-        irr_ok = row.irr >= irr_min
-        loading_ok = row.loading_surplus >= threshold
-        premium_ok = row.premium_to_maturity_ratio <= premium_hard_max
-        nbv_ok = row.new_business_value >= nbv_hard
-        if row.model_point in watch_ids:
-            status = "watch"
-        else:
-            status = "pass" if irr_ok and loading_ok and premium_ok and nbv_ok else "fail"
-        lines.append(
-            f"{row.model_point} irr={row.irr} nbv={row.new_business_value} "
-            f"loading_surplus={row.loading_surplus} premium_to_maturity={row.premium_to_maturity_ratio} "
-            f"loading_surplus_threshold={threshold} loading_surplus_ratio={loading_ratio} "
-            f"status={status}"
-        )
-        if status == "fail":
-            if not irr_ok:
-                lines.append(
+    loading_params = config.get("loading_parameters")  # 係数が明示されているか確認する
+    if loading_params is None:  # 直接指定がなければ補助関数で読み取る
+        params = read_loading_parameters(config)  # loading_parameters/ function から読み込む
+        if params is not None:  # 読み取れた場合のみ辞書化する
+            loading_params = {  # ログ出力用に辞書に詰める
+                "a0": params.a0,  # alpha基礎
+                "a_age": params.a_age,  # alpha年齢
+                "a_term": params.a_term,  # alpha期間
+                "a_sex": params.a_sex,  # alpha性別
+                "b0": params.b0,  # beta基礎
+                "b_age": params.b_age,  # beta年齢
+                "b_term": params.b_term,  # beta期間
+                "b_sex": params.b_sex,  # beta性別
+                "g0": params.g0,  # gamma基礎
+                "g_term": params.g_term,  # gamma期間
+            }  # 辞書化したパラメータ
+
+    lines = ["run"]  # 出力行を配列で構築する
+    if loading_params:  # loading係数があれば出力に含める
+        lines.append("loading_parameters")  # セクション見出しを追加する
+        for key in [  # 表示順を固定するためのキー配列
+            "a0",  # alpha基礎
+            "a_age",  # alpha年齢
+            "a_term",  # alpha期間
+            "a_sex",  # alpha性別
+            "b0",  # beta基礎
+            "b_age",  # beta年齢
+            "b_term",  # beta期間
+            "b_sex",  # beta性別
+            "g0",  # gamma基礎
+            "g_term",  # gamma期間
+        ]:  # 出力順の定義ここまで
+            if key in loading_params:  # キーが存在する場合のみ出力する
+                lines.append(f"{key}: {loading_params[key]}")  # 値を文字列化して追加する
+
+    lines.append("model_point_results")  # モデルポイント結果のセクションを開始する
+    for row in result.summary.itertuples(index=False):  # サマリ行を走査して出力する
+        threshold = loading_surplus_threshold(settings, int(row.sum_assured))  # 充足額の閾値を算出する
+        loading_ratio = row.loading_surplus / float(row.sum_assured)  # 充足比率を計算する
+        irr_ok = row.irr >= irr_min  # IRR制約を満たすか判定する
+        loading_ok = row.loading_surplus >= threshold  # 充足額制約を満たすか判定する
+        premium_ok = row.premium_to_maturity_ratio <= premium_hard_max  # premium-to-maturity上限制約を判定する
+        nbv_ok = row.new_business_value >= nbv_hard  # NBV制約を判定する
+        if row.model_point in watch_ids:  # 監視対象ならステータスを特別扱いする
+            status = "watch"  # 監視ステータス
+        else:  # 監視対象でなければ通常判定
+            status = "pass" if irr_ok and loading_ok and premium_ok and nbv_ok else "fail"  # 全制約を満たすかで判定する
+        lines.append(  # 1行で主要な指標を出力する
+            f"{row.model_point} irr={row.irr} nbv={row.new_business_value} "  # IRRとNBVを出力する
+            f"loading_surplus={row.loading_surplus} premium_to_maturity={row.premium_to_maturity_ratio} "  # 充足額とPTMを出力する
+            f"loading_surplus_threshold={threshold} loading_surplus_ratio={loading_ratio} "  # 閾値と比率を出力する
+            f"status={status}"  # ステータスを出力する
+        )  # 行を追加する
+        if status == "fail":  # 失敗の場合は短所を追記する
+            if not irr_ok:  # IRRが下限未達の場合
+                lines.append(  # shortfall情報を出力する
                     f"shortfall: irr_hard {row.model_point} {irr_min - row.irr:.6f}"
-                )
-            if not loading_ok:
-                lines.append(
+                )  # IRR不足分を出力する
+            if not loading_ok:  # 充足額が不足する場合
+                lines.append(  # shortfall情報を出力する
                     f"shortfall: loading_surplus_hard {row.model_point} {threshold - row.loading_surplus:.2f}"
-                )
-            if not premium_ok:
-                lines.append(
+                )  # 充足額不足分を出力する
+            if not premium_ok:  # premium-to-maturityが上限超過の場合
+                lines.append(  # shortfall情報を出力する
                     f"shortfall: premium_to_maturity_hard {row.model_point} {row.premium_to_maturity_ratio - premium_hard_max:.6f}"
-                )
-            if not nbv_ok:
-                lines.append(
+                )  # 超過分を出力する
+            if not nbv_ok:  # NBVが下限未達の場合
+                lines.append(  # shortfall情報を出力する
                     f"shortfall: nbv_hard {row.model_point} {nbv_hard - row.new_business_value:.2f}"
-                )
-        if row.premium_to_maturity_ratio > 1.0:
-            lines.append(f"warning: premium_total_exceeds_maturity {row.model_point}")
+                )  # 不足分を出力する
+        if row.premium_to_maturity_ratio > 1.0:  # 総保険料が満期保険金を超える場合
+            lines.append(f"warning: premium_total_exceeds_maturity {row.model_point}")  # 警告を出力する
 
-    if any(
-        row.irr < irr_min and row.model_point not in watch_ids
-        for row in result.summary.itertuples(index=False)
-    ):
-        lines.append("constraint_check: irr_hard failed")
-    if any(
-        row.loading_surplus < loading_surplus_threshold(settings, int(row.sum_assured))
-        and row.model_point not in watch_ids
-        for row in result.summary.itertuples(index=False)
-    ):
-        lines.append("constraint_check: loading_surplus_hard failed")
-    if any(
-        row.premium_to_maturity_ratio > premium_hard_max
-        and row.model_point not in watch_ids
-        for row in result.summary.itertuples(index=False)
-    ):
-        lines.append("constraint_check: premium_to_maturity_hard failed")
-    if any(
-        row.new_business_value < nbv_hard and row.model_point not in watch_ids
-        for row in result.summary.itertuples(index=False)
-    ):
-        lines.append("constraint_check: nbv_hard failed")
+    if any(  # IRR制約が1つでも破れているか判定する
+        row.irr < irr_min and row.model_point not in watch_ids  # 監視対象を除いて判定する
+        for row in result.summary.itertuples(index=False)  # サマリ行を走査する
+    ):  # 判定条件ここまで
+        lines.append("constraint_check: irr_hard failed")  # 制約違反のまとめを出す
+    if any(  # 充足額制約が破れているか判定する
+        row.loading_surplus < loading_surplus_threshold(settings, int(row.sum_assured))  # 閾値を計算して判定
+        and row.model_point not in watch_ids  # 監視対象は除外する
+        for row in result.summary.itertuples(index=False)  # サマリ行を走査する
+    ):  # 判定条件ここまで
+        lines.append("constraint_check: loading_surplus_hard failed")  # 制約違反のまとめを出す
+    if any(  # premium-to-maturity制約が破れているか判定する
+        row.premium_to_maturity_ratio > premium_hard_max  # 上限超過を判定する
+        and row.model_point not in watch_ids  # 監視対象は除外する
+        for row in result.summary.itertuples(index=False)  # サマリ行を走査する
+    ):  # 判定条件ここまで
+        lines.append("constraint_check: premium_to_maturity_hard failed")  # 制約違反のまとめを出す
+    if any(  # NBV制約が破れているか判定する
+        row.new_business_value < nbv_hard and row.model_point not in watch_ids  # 監視対象を除外して判定する
+        for row in result.summary.itertuples(index=False)  # サマリ行を走査する
+    ):  # 判定条件ここまで
+        lines.append("constraint_check: nbv_hard failed")  # 制約違反のまとめを出す
 
-    return "\n".join(lines)
+    return "\n".join(lines)  # まとめた行を1つの文字列として返す
 
 
-def run_from_config(config_path: Path) -> int:
+def run_from_config(config_path: Path) -> int:  # YAML設定を使ってprofit testを実行する
     """
     Run profit test from a YAML config file and write outputs.
     """
-    config = _load_config(config_path)
-    base_dir = Path.cwd()
-    result = run_profit_test(config, base_dir=base_dir)
+    config = _load_config(config_path)  # 設定ファイルを読み込む
+    base_dir = Path.cwd()  # 相対パス解決の基準ディレクトリを取得する
+    result = run_profit_test(config, base_dir=base_dir)  # 収益性検証を実行する
 
-    outputs_cfg = config.get("outputs", {})
-    excel_path = base_dir / outputs_cfg.get("excel_path", "out/result.xlsx")
-    log_path = base_dir / outputs_cfg.get("log_path", "out/result.log")
+    outputs_cfg = config.get("outputs", {})  # 出力設定を取得する
+    excel_path = base_dir / outputs_cfg.get("excel_path", "out/result.xlsx")  # Excel出力先を決める
+    log_path = base_dir / outputs_cfg.get("log_path", "out/result.log")  # ログ出力先を決める
 
-    write_profit_test_excel(excel_path, result)
-    write_profit_test_log(log_path, config, result)
-    print(_format_run_output(config, result))
-    return 0
+    write_profit_test_excel(excel_path, result)  # Excel結果を書き出す
+    write_profit_test_log(log_path, config, result)  # ログ結果を書き出す
+    print(_format_run_output(config, result))  # 標準出力にも結果サマリを表示する
+    return 0  # 正常終了コードを返す
 
 
-def optimize_from_config(config_path: Path) -> int:
+def optimize_from_config(config_path: Path) -> int:  # YAML設定を使って最適化を実行する
     """
     Optimize loading parameters from a YAML config file.
     """
-    config = _load_config(config_path)
-    base_dir = Path.cwd()
-    result = optimize_loading_parameters(config, base_dir=base_dir)
+    config = _load_config(config_path)  # 設定ファイルを読み込む
+    base_dir = Path.cwd()  # 相対パス解決の基準ディレクトリを取得する
+    result = optimize_loading_parameters(config, base_dir=base_dir)  # 最適化を実行する
 
-    outputs_cfg = config.get("outputs", {})
-    log_path = base_dir / outputs_cfg.get("log_path", "out/result.log")
-    write_optimize_log(log_path, config, result)
+    outputs_cfg = config.get("outputs", {})  # 出力設定を取得する
+    log_path = base_dir / outputs_cfg.get("log_path", "out/result.log")  # ログ出力先を決める
+    write_optimize_log(log_path, config, result)  # 最適化ログを出力する
 
-    optimized_path = outputs_cfg.get("optimized_config_path")
-    if optimized_path:
-        output_path = base_dir / optimized_path
-    else:
-        output_path = config_path.with_name(f"{config_path.stem}.optimized.yaml")
-    write_optimized_config(config, result, output_path)
+    optimized_path = outputs_cfg.get("optimized_config_path")  # 最適化後の設定保存先を取得する
+    if optimized_path:  # 設定に保存先があればそれを使う
+        output_path = base_dir / optimized_path  # 相対パスを基準ディレクトリに結合する
+    else:  # 明示が無ければ元ファイル名に .optimized を付ける
+        output_path = config_path.with_name(f"{config_path.stem}.optimized.yaml")  # デフォルトの保存先を作る
+    write_optimized_config(config, result, output_path)  # 最適化後の設定ファイルを書き出す
 
-    print(log_path.read_text(encoding="utf-8"))
-    return 0
+    print(log_path.read_text(encoding="utf-8"))  # ログ内容を標準出力に表示する
+    return 0  # 正常終了コードを返す
 
 
-def sweep_ptm_from_config(
-    config_path: Path,
-    model_point_label: str,
-    start: float,
-    end: float,
-    step: float,
-    irr_threshold: float,
-    nbv_threshold: float,
-    loading_surplus_ratio_threshold: float,
-    premium_to_maturity_hard_max: float,
-    out_path: Path | None,
-    all_model_points: bool,
-) -> int:
+def sweep_ptm_from_config(  # premium-to-maturityスイープをYAML設定から実行する
+    config_path: Path,  # 設定ファイルのパス
+    model_point_label: str,  # 対象モデルポイントのラベル
+    start: float,  # スイープ開始値
+    end: float,  # スイープ終了値
+    step: float,  # スイープ刻み
+    irr_threshold: float,  # IRR閾値
+    nbv_threshold: float,  # NBV閾値
+    loading_surplus_ratio_threshold: float,  # 費用充足比率の閾値
+    premium_to_maturity_hard_max: float,  # premium-to-maturityの上限
+    out_path: Path | None,  # 出力ファイルの指定（任意）
+    all_model_points: bool,  # 全モデルポイント対象かどうか
+) -> int:  # 正常終了コードを返す
     """
     Sweep premium-to-maturity ratios for model points and write CSV output.
     """
-    config = _load_config(config_path)
-    base_dir = Path.cwd()
-    output_path = out_path
-    if output_path is None:
-        output_path = (
-            base_dir / "out/sweep_ptm_all.csv"
-            if all_model_points
-            else base_dir / f"out/sweep_ptm_{model_point_label}.csv"
-        )
+    config = _load_config(config_path)  # 設定ファイルを読み込む
+    base_dir = Path.cwd()  # 相対パス解決の基準ディレクトリを取得する
+    output_path = out_path  # 出力先を一旦受け取る
+    if output_path is None:  # 出力先指定がない場合はデフォルトを使う
+        output_path = (  # 全件か単独かで出力名を切り替える
+            base_dir / "out/sweep_ptm_all.csv"  # 全件スイープ時の出力名
+            if all_model_points  # 全件かどうかの判定
+            else base_dir / f"out/sweep_ptm_{model_point_label}.csv"  # 単独スイープ時の出力名
+        )  # 出力先の決定ここまで
 
-    if all_model_points:
-        try:
-            _, min_r_by_id = sweep_premium_to_maturity_all(
-                config=config,
-                base_dir=base_dir,
-                start=start,
-                end=end,
-                step=step,
-                irr_threshold=irr_threshold,
-                nbv_threshold=nbv_threshold,
-                loading_surplus_ratio_threshold=loading_surplus_ratio_threshold,
-                premium_to_maturity_hard_max=premium_to_maturity_hard_max,
-                out_path=output_path,
-            )
-        except ValueError as exc:
-            raise SystemExit(2) from exc
+    if all_model_points:  # 全モデルポイントを対象とする場合
+        try:  # 例外を捕捉してCLIの終了コードに変換する
+            _, min_r_by_id = sweep_premium_to_maturity_all(  # 全件スイープを実行する
+                config=config,  # 設定を渡す
+                base_dir=base_dir,  # 基準ディレクトリを渡す
+                start=start,  # 開始値
+                end=end,  # 終了値
+                step=step,  # 刻み
+                irr_threshold=irr_threshold,  # IRR閾値
+                nbv_threshold=nbv_threshold,  # NBV閾値
+                loading_surplus_ratio_threshold=loading_surplus_ratio_threshold,  # 充足比率閾値
+                premium_to_maturity_hard_max=premium_to_maturity_hard_max,  # PTM上限
+                out_path=output_path,  # CSV出力先
+            )  # スイープ実行
+        except ValueError as exc:  # 入力不正などの例外
+            raise SystemExit(2) from exc  # CLIとしてエラー終了に変換する
 
-        print("min_r_by_model_point")
-        for model_id, min_r in min_r_by_id.items():
-            if min_r is None:
-                print(f"{model_id}: not found")
-            else:
-                print(f"{model_id}: {min_r}")
-    else:
-        try:
-            df, min_r = sweep_premium_to_maturity(
-                config=config,
-                base_dir=base_dir,
-                model_point_label=model_point_label,
-                start=start,
-                end=end,
-                step=step,
-                irr_threshold=irr_threshold,
-                out_path=output_path,
-            )
-        except ValueError as exc:
-            raise SystemExit(2) from exc
+        print("min_r_by_model_point")  # 最小rの結果を出力する見出し
+        for model_id, min_r in min_r_by_id.items():  # 各モデルポイントの最小rを表示する
+            if min_r is None:  # 見つからない場合
+                print(f"{model_id}: not found")  # 見つからない旨を出力
+            else:  # 見つかった場合
+                print(f"{model_id}: {min_r}")  # 最小rを出力
+    else:  # 単独モデルポイントの場合
+        try:  # 例外を捕捉してCLIの終了コードに変換する
+            df, min_r = sweep_premium_to_maturity(  # 単独スイープを実行する
+                config=config,  # 設定を渡す
+                base_dir=base_dir,  # 基準ディレクトリを渡す
+                model_point_label=model_point_label,  # 対象モデルポイントを指定する
+                start=start,  # 開始値
+                end=end,  # 終了値
+                step=step,  # 刻み
+                irr_threshold=irr_threshold,  # IRR閾値
+                out_path=output_path,  # CSV出力先
+            )  # スイープ実行
+        except ValueError as exc:  # 入力不正などの例外
+            raise SystemExit(2) from exc  # CLIとしてエラー終了に変換する
 
-        print(df.to_csv(index=False))
-        if min_r is None:
-            print("min_r: not found")
-        else:
-            print(f"min_r: {min_r}")
-    return 0
+        print(df.to_csv(index=False))  # 結果CSVを標準出力に表示する
+        if min_r is None:  # 見つからない場合
+            print("min_r: not found")  # 見つからない旨を出力する
+        else:  # 見つかった場合
+            print(f"min_r: {min_r}")  # 最小rを出力する
+    return 0  # 正常終了コードを返す
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Pricing automation CLI.")
-    subparsers = parser.add_subparsers(dest="command", required=True)
+def main(argv: list[str] | None = None) -> int:  # CLIのメイン処理を実装する
+    parser = argparse.ArgumentParser(description="Pricing automation CLI.")  # CLI全体の説明を設定する
+    subparsers = parser.add_subparsers(dest="command", required=True)  # サブコマンドを必須化する
 
-    run_parser = subparsers.add_parser("run", help="Run profit test with a config.")
-    run_parser.add_argument("config", type=str, help="Path to config YAML.")
-    optimize_parser = subparsers.add_parser(
+    run_parser = subparsers.add_parser("run", help="Run profit test with a config.")  # runコマンドを定義する
+    run_parser.add_argument("config", type=str, help="Path to config YAML.")  # 設定ファイルを引数で受け取る
+    optimize_parser = subparsers.add_parser(  # optimizeコマンドを定義する
         "optimize", help="Optimize loading parameters with a config."
-    )
-    optimize_parser.add_argument("config", type=str, help="Path to config YAML.")
-    sweep_parser = subparsers.add_parser(
+    )  # optimizeコマンドの登録
+    optimize_parser.add_argument("config", type=str, help="Path to config YAML.")  # 設定ファイルを引数で受け取る
+    sweep_parser = subparsers.add_parser(  # sweep-ptmコマンドを定義する
         "sweep-ptm", help="Sweep premium-to-maturity ratios for a model point."
-    )
-    sweep_parser.add_argument("config", type=str, help="Path to config YAML.")
-    sweep_parser.add_argument(
-        "--model-point",
-        type=str,
-        default="male_age30_term35",
-        help="Target model point label.",
-    )
-    sweep_parser.add_argument("--start", type=float, required=True)
-    sweep_parser.add_argument("--end", type=float, required=True)
-    sweep_parser.add_argument("--step", type=float, required=True)
-    sweep_parser.add_argument("--irr-threshold", type=float, default=0.04)
-    sweep_parser.add_argument("--all-model-points", action="store_true")
-    sweep_parser.add_argument(
+    )  # sweep-ptmコマンドの登録
+    sweep_parser.add_argument("config", type=str, help="Path to config YAML.")  # 設定ファイルを引数で受け取る
+    sweep_parser.add_argument(  # モデルポイントの指定を追加する
+        "--model-point",  # 引数名
+        type=str,  # 文字列として受け取る
+        default="male_age30_term35",  # デフォルトのモデルポイント
+        help="Target model point label.",  # 引数の説明
+    )  # 引数定義
+    sweep_parser.add_argument("--start", type=float, required=True)  # スイープ開始値
+    sweep_parser.add_argument("--end", type=float, required=True)  # スイープ終了値
+    sweep_parser.add_argument("--step", type=float, required=True)  # スイープ刻み
+    sweep_parser.add_argument("--irr-threshold", type=float, default=0.04)  # IRR閾値
+    sweep_parser.add_argument("--all-model-points", action="store_true")  # 全モデルポイント対象フラグ
+    sweep_parser.add_argument(  # 充足比率の閾値を指定する
         "--loading-surplus-ratio-threshold", type=float, default=-0.10
-    )
-    sweep_parser.add_argument("--nbv-threshold", type=float, default=0.0)
-    sweep_parser.add_argument("--premium-to-maturity-hard-max", type=float, default=1.05)
-    sweep_parser.add_argument("--out", type=str, default=None)
+    )  # 引数定義
+    sweep_parser.add_argument("--nbv-threshold", type=float, default=0.0)  # NBV閾値
+    sweep_parser.add_argument("--premium-to-maturity-hard-max", type=float, default=1.05)  # PTM上限
+    sweep_parser.add_argument("--out", type=str, default=None)  # 出力先の指定
 
-    args = parser.parse_args(argv)
-    if args.command == "run":
-        return run_from_config(Path(args.config))
-    if args.command == "optimize":
-        return optimize_from_config(Path(args.config))
-    if args.command == "sweep-ptm":
-        return sweep_ptm_from_config(
-            Path(args.config),
-            model_point_label=args.model_point,
-            start=float(args.start),
-            end=float(args.end),
-            step=float(args.step),
-            irr_threshold=float(args.irr_threshold),
-            nbv_threshold=float(args.nbv_threshold),
-            loading_surplus_ratio_threshold=float(args.loading_surplus_ratio_threshold),
-            premium_to_maturity_hard_max=float(args.premium_to_maturity_hard_max),
-            out_path=Path(args.out) if args.out else None,
-            all_model_points=bool(args.all_model_points),
-        )
+    args = parser.parse_args(argv)  # CLI引数を解析する
+    if args.command == "run":  # runコマンドの場合
+        return run_from_config(Path(args.config))  # run処理を実行する
+    if args.command == "optimize":  # optimizeコマンドの場合
+        return optimize_from_config(Path(args.config))  # 最適化処理を実行する
+    if args.command == "sweep-ptm":  # sweep-ptmコマンドの場合
+        return sweep_ptm_from_config(  # スイープ処理を実行する
+            Path(args.config),  # 設定ファイルのパス
+            model_point_label=args.model_point,  # モデルポイントラベル
+            start=float(args.start),  # 開始値
+            end=float(args.end),  # 終了値
+            step=float(args.step),  # 刻み
+            irr_threshold=float(args.irr_threshold),  # IRR閾値
+            nbv_threshold=float(args.nbv_threshold),  # NBV閾値
+            loading_surplus_ratio_threshold=float(args.loading_surplus_ratio_threshold),  # 充足比率閾値
+            premium_to_maturity_hard_max=float(args.premium_to_maturity_hard_max),  # PTM上限
+            out_path=Path(args.out) if args.out else None,  # 出力先（指定時のみ）
+            all_model_points=bool(args.all_model_points),  # 全モデルポイントフラグ
+        )  # sweep-ptmを実行する
 
-    return 1
+    return 1  # 未知のコマンドは異常終了として扱う
 
 
-if __name__ == "__main__":
-    raise SystemExit(main())
+if __name__ == "__main__":  # 直接実行された場合のみCLIを起動する
+    raise SystemExit(main())  # mainの戻り値を終了コードとして返す
