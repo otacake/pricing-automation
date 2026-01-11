@@ -94,7 +94,23 @@ optimization:
   watch_model_point_ids:
     - male_age50_term20
   premium_to_maturity_hard_max: 1.05
-  premium_to_maturity_soft_min: 1.01   # 追加：これ未満は罰則
+  premium_to_maturity_soft_min: 1.005   # 追加：これ未満は罰則
+
+  bounds:
+    a_age:
+      step: 0.0002
+    a_term:
+      step: 0.0002
+    a_sex:
+      step: 0.0005
+    b_age:
+      step: 0.0001
+    b_term:
+      step: 0.0001
+    b_sex:
+      step: 0.0005
+    g_term:
+      step: 0.001
 
   loading_surplus_hard_ratio: -0.10
   nbv_hard: 0.0
