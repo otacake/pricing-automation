@@ -7,6 +7,7 @@ Optimization utilities for loading function parameters.
 from dataclasses import dataclass, replace
 from pathlib import Path
 import copy
+import math
 import yaml
 
 from .config import (
@@ -35,6 +36,8 @@ class OptimizationResult:
     - exempt_model_points: model point IDs skipped in hard constraints
     - exemption_settings: exemption policy configuration (if enabled)
     - watch_model_points: model point IDs excluded from objective/constraints
+    - min_irr: minimum IRR among evaluated model points
+    - min_irr_model_point: model point ID that attains min_irr
     """
 
     params: LoadingFunctionParams
@@ -45,6 +48,8 @@ class OptimizationResult:
     exempt_model_points: list[str]
     exemption_settings: ExemptionSettings | None
     watch_model_points: list[str]
+    min_irr: float
+    min_irr_model_point: str | None
 
 
 @dataclass(frozen=True)
@@ -55,6 +60,8 @@ class CandidateEvaluation:
     Units
     - objective: penalty sum (dimensionless)
     - violation: hard constraint penalty sum (dimensionless)
+    - min_irr: minimum IRR among evaluated model points
+    - min_irr_model_point: model point ID that attains min_irr
     """
 
     params: LoadingFunctionParams
@@ -65,6 +72,9 @@ class CandidateEvaluation:
     irr_penalty: float
     premium_penalty: float
     l2_penalty: float
+    ptm_soft_penalty: float
+    min_irr: float
+    min_irr_model_point: str | None
     failure_details: list[str]
 
 
@@ -82,11 +92,17 @@ def _evaluate(
     irr_penalty = 0.0
     premium_penalty = 0.0
     hard_violation = 0.0
+    ptm_soft_penalty = 0.0
     failure_details: list[str] = []
+    min_irr = math.inf
+    min_irr_model_point: str | None = None
     for res in result.results:
         label = model_point_label(res.model_point)
         if label in exempt_model_points or label in watch_model_points:
             continue
+        if res.irr < min_irr:
+            min_irr = res.irr
+            min_irr_model_point = label
         threshold = loading_surplus_threshold(settings, res.model_point.sum_assured)
         irr_shortfall = max(settings.irr_hard - res.irr, 0.0)
         if irr_shortfall > 0:
@@ -124,6 +140,15 @@ def _evaluate(
             res.premium_to_maturity_ratio - settings.premium_to_maturity_target, 0.0
         )
         premium_penalty += premium_gap * premium_gap
+        if settings.premium_to_maturity_soft_min is not None:
+            soft_gap = max(
+                settings.premium_to_maturity_soft_min - res.premium_to_maturity_ratio, 0.0
+            )
+            ptm_soft_penalty += soft_gap * soft_gap
+
+    if min_irr is math.inf:
+        min_irr = float("nan")
+        min_irr_model_point = None
 
     l2_penalty = 0.0
     for name in stage_vars:
@@ -141,6 +166,9 @@ def _evaluate(
         irr_penalty=irr_penalty,
         premium_penalty=premium_penalty,
         l2_penalty=l2_penalty,
+        ptm_soft_penalty=ptm_soft_penalty,
+        min_irr=min_irr,
+        min_irr_model_point=min_irr_model_point,
         failure_details=failure_details,
     )
 
@@ -148,12 +176,30 @@ def _evaluate(
 def _is_better_candidate(
     candidate: CandidateEvaluation,
     best: CandidateEvaluation | None,
+    settings: OptimizationSettings,
 ) -> bool:
     if best is None:
         return True
     if candidate.feasible and not best.feasible:
         return True
     if candidate.feasible and best.feasible:
+        if settings.objective_mode == "maximize_min_irr":
+            candidate_min_irr = (
+                candidate.min_irr if not math.isnan(candidate.min_irr) else -math.inf
+            )
+            best_min_irr = (
+                best.min_irr if not math.isnan(best.min_irr) else -math.inf
+            )
+            if candidate_min_irr > best_min_irr + 1e-12:
+                return True
+            if abs(candidate_min_irr - best_min_irr) <= 1e-12:
+                if settings.premium_to_maturity_soft_min is not None:
+                    if candidate.ptm_soft_penalty < best.ptm_soft_penalty - 1e-12:
+                        return True
+                    if abs(candidate.ptm_soft_penalty - best.ptm_soft_penalty) <= 1e-12:
+                        return candidate.objective < best.objective - 1e-12
+                return candidate.objective < best.objective - 1e-12
+            return False
         return candidate.objective < best.objective - 1e-12
     if not candidate.feasible and not best.feasible:
         if candidate.violation < best.violation - 1e-12:
@@ -223,7 +269,7 @@ def _run_stage(
                     watch_model_points,
                 )
                 iterations += 1
-                if _is_better_candidate(candidate_eval, current_eval):
+                if _is_better_candidate(candidate_eval, current_eval, settings):
                     current_params = candidate_params
                     current_eval = candidate_eval
                     improved = True
@@ -308,7 +354,7 @@ def optimize_loading_parameters(
         )
         total_iterations += iterations
         current_params = stage_eval.params
-        if _is_better_candidate(stage_eval, best_eval):
+        if _is_better_candidate(stage_eval, best_eval, settings):
             best_eval = stage_eval
 
     if best_eval is None:
@@ -323,6 +369,8 @@ def optimize_loading_parameters(
         exempt_model_points=exempt_model_points,
         exemption_settings=exemption if exemption.enabled else None,
         watch_model_points=settings.watch_model_point_ids,
+        min_irr=best_eval.min_irr,
+        min_irr_model_point=best_eval.min_irr_model_point,
     )
 
 

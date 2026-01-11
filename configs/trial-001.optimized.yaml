@@ -100,5 +100,5 @@ optimize_summary:
   min_irr: 0.015781950543319344
   min_loading_surplus: -245794.86194546812
   max_premium_to_maturity: 1.0621533333333333
-  iterations: 129
+  iterations: 5092
   success: true

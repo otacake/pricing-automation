@@ -114,6 +114,8 @@ class OptimizationSettings:
     - l2_lambda: weight for L2 regularization
     - max_iterations_per_stage: iteration count
     - watch_model_point_ids: model points excluded from objective/constraints
+    - objective_mode: optimization objective mode
+    - premium_to_maturity_soft_min: soft minimum for premium ratio (tie-break)
     """
 
     irr_hard: float
@@ -128,6 +130,8 @@ class OptimizationSettings:
     l2_lambda: float
     max_iterations_per_stage: int
     watch_model_point_ids: list[str]
+    objective_mode: str
+    premium_to_maturity_soft_min: float | None
 
 
 @dataclass(frozen=True)
@@ -176,6 +180,8 @@ def load_optimization_settings(config: Mapping[str, object]) -> OptimizationSett
         "l2_lambda": 0.1,
         "max_iterations_per_stage": 5000,
         "watch_model_point_ids": [],
+        "objective_mode": "penalty",
+        "premium_to_maturity_soft_min": None,
     }
 
     constraints_cfg = config.get("constraints", {}) if isinstance(config, Mapping) else {}
@@ -204,6 +210,13 @@ def load_optimization_settings(config: Mapping[str, object]) -> OptimizationSett
     l2_lambda = optimization_cfg.get("l2_lambda", defaults["l2_lambda"])
     max_iterations_per_stage = optimization_cfg.get(
         "max_iterations_per_stage", defaults["max_iterations_per_stage"]
+    )
+    objective_cfg = optimization_cfg.get("objective", {})
+    if not isinstance(objective_cfg, Mapping):
+        objective_cfg = {}
+    objective_mode = objective_cfg.get("mode", defaults["objective_mode"])
+    premium_to_maturity_soft_min = optimization_cfg.get(
+        "premium_to_maturity_soft_min", defaults["premium_to_maturity_soft_min"]
     )
     watch_ids = optimization_cfg.get(
         "watch_model_point_ids", defaults["watch_model_point_ids"]
@@ -301,6 +314,12 @@ def load_optimization_settings(config: Mapping[str, object]) -> OptimizationSett
         l2_lambda=float(l2_lambda),
         max_iterations_per_stage=int(max_iterations_per_stage),
         watch_model_point_ids=[str(item) for item in watch_ids],
+        objective_mode=str(objective_mode),
+        premium_to_maturity_soft_min=(
+            None
+            if premium_to_maturity_soft_min is None
+            else float(premium_to_maturity_soft_min)
+        ),
     )
 
 
