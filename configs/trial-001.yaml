@@ -13,48 +13,56 @@ model_points:
     term_years: 35
     premium_paying_years: 35
     sum_assured: 3000000
+
   - id: male_age40_term25
     sex: male
     issue_age: 40
     term_years: 25
     premium_paying_years: 25
     sum_assured: 3000000
+
   - id: male_age50_term20
     sex: male
     issue_age: 50
     term_years: 20
     premium_paying_years: 20
     sum_assured: 3000000
+
   - id: male_age60_term10
     sex: male
     issue_age: 60
     term_years: 10
     premium_paying_years: 10
     sum_assured: 3000000
+
   - id: female_age30_term35
     sex: female
     issue_age: 30
     term_years: 35
     premium_paying_years: 35
     sum_assured: 3000000
+
   - id: female_age40_term25
     sex: female
     issue_age: 40
     term_years: 25
     premium_paying_years: 25
     sum_assured: 3000000
+
   - id: female_age50_term20
     sex: female
     issue_age: 50
     term_years: 20
     premium_paying_years: 20
     sum_assured: 3000000
+
   - id: female_age60_term10
     sex: female
     issue_age: 60
     term_years: 10
     premium_paying_years: 10
     sum_assured: 3000000
+
 
 pricing:
   interest:
@@ -64,11 +72,20 @@ pricing:
   lapse:
     annual_rate: 0.0
 
+loading_alpha_beta_gamma:
+  alpha: 0.03
+  beta: 0.007
+  gamma: 0.03
+
 profit_test:
   discount_curve_path: "data/spot_curve_actual.csv"
   mortality_actual_path: "data/mortality_actual.csv"
   expense_model:
     company_data_path: "data/company_expense.csv"
+    allocation_rule:
+      acquisition_fixed_basis: "new_policies"
+      maintenance_fixed_basis: "inforce_avg"
+      collection_fixed_basis: "premium_income"
     include_overhead_as:
       acquisition: 0.5
       maintenance: 0.5
