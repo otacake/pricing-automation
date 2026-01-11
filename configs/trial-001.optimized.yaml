@@ -1,0 +1,115 @@
+run:
+  run_id: trial-001
+  as_of: '2026-01-11'
+product:
+  type: endowment
+  term_years: 28
+  premium_paying_years: 28
+  sum_assured: 10000000
+  premium_mode: annual
+model_point:
+  issue_age: 37
+  sex: male
+model_points:
+- id: male_age30_term35
+  sex: male
+  issue_age: 30
+  term_years: 35
+  premium_paying_years: 35
+  sum_assured: 3000000
+- id: male_age40_term25
+  sex: male
+  issue_age: 40
+  term_years: 25
+  premium_paying_years: 25
+  sum_assured: 3000000
+- id: male_age50_term20
+  sex: male
+  issue_age: 50
+  term_years: 20
+  premium_paying_years: 20
+  sum_assured: 3000000
+- id: male_age60_term10
+  sex: male
+  issue_age: 60
+  term_years: 10
+  premium_paying_years: 10
+  sum_assured: 3000000
+- id: female_age30_term35
+  sex: female
+  issue_age: 30
+  term_years: 35
+  premium_paying_years: 35
+  sum_assured: 3000000
+- id: female_age40_term25
+  sex: female
+  issue_age: 40
+  term_years: 25
+  premium_paying_years: 25
+  sum_assured: 3000000
+- id: female_age50_term20
+  sex: female
+  issue_age: 50
+  term_years: 20
+  premium_paying_years: 20
+  sum_assured: 3000000
+- id: female_age60_term10
+  sex: female
+  issue_age: 60
+  term_years: 10
+  premium_paying_years: 10
+  sum_assured: 3000000
+pricing:
+  interest:
+    type: flat
+    flat_rate: 0.01
+  mortality_path: data/mortality_pricing.csv
+  lapse:
+    annual_rate: 0.0
+loading_alpha_beta_gamma:
+  alpha: 0.03
+  beta: 0.007
+  gamma: 0.03
+profit_test:
+  discount_curve_path: data/spot_curve_actual.csv
+  mortality_actual_path: data/mortality_actual.csv
+  expense_model:
+    company_data_path: data/company_expense.csv
+    allocation_rule:
+      acquisition_fixed_basis: new_policies
+      maintenance_fixed_basis: inforce_avg
+      collection_fixed_basis: premium_income
+    include_overhead_as:
+      acquisition: 0.5
+      maintenance: 0.5
+outputs:
+  excel_path: out/result_trial-001.xlsx
+  log_path: out/result_trial-001.log
+optimization:
+  exemption:
+    enabled: true
+    method: sweep_ptm
+    sweep:
+      start: 1.0
+      end: 1.05
+      step: 0.01
+      irr_threshold: 0.0
+  irr_hard: 0.02
+  irr_target: 0.06
+loading_parameters:
+  a0: 0.001999999999999986
+  a_age: 0.0
+  a_term: -0.0025
+  a_sex: 0.001
+  b0: 0.005
+  b_age: 0.0
+  b_term: 0.0
+  b_sex: 0.0
+  g0: 0.03
+  g_term: 0.0
+optimize_summary:
+  min_irr: 0.008437240883871922
+  min_loading_surplus: -265705.9430857406
+  max_premium_to_maturity: 1.0705
+  iterations: 137
+  success: false

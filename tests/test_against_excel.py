@@ -208,7 +208,12 @@ def test_profit_test_against_excel() -> None:
 
     config_path = REPO_ROOT / "configs" / "trial-001.yaml"
     config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    config.pop("model_points", None)
+    profit_test_cfg = dict(config.get("profit_test", {}))
+    profit_test_cfg["expense_model"] = {"mode": "loading"}
+    config["profit_test"] = profit_test_cfg
     result = run_profit_test(config, base_dir=REPO_ROOT)
+    single = result.results[0]
 
-    assert math.isclose(result.irr, expected_irr, abs_tol=1e-9)
-    assert math.isclose(result.new_business_value, expected_nbv, abs_tol=1e-6)
+    assert math.isclose(single.irr, expected_irr, abs_tol=1e-9)
+    assert math.isclose(single.new_business_value, expected_nbv, abs_tol=1e-6)

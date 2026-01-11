@@ -7,11 +7,16 @@ src/pricing/config.py
 src/pricing/endowment.py
 src/pricing/io.py
 src/pricing/log.py
+src/pricing/optimize.py
 src/pricing/outputs.py
 src/pricing/profit_test.py
+src/pricing/sweep_ptm.py
+src/pricing/virtual_company.py
 src/pricing_automation.egg-info/PKG-INFO
 src/pricing_automation.egg-info/SOURCES.txt
 src/pricing_automation.egg-info/dependency_links.txt
 src/pricing_automation.egg-info/requires.txt
 src/pricing_automation.egg-info/top_level.txt
 tests/test_against_excel.py
+tests/test_optimize_exemption.py
+tests/test_sweep_ptm.py

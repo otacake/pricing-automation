@@ -27,6 +27,44 @@ from .commutation import build_mortality_q_by_age, survival_probabilities
 
 
 @dataclass(frozen=True)
+class LoadingFunctionParams:
+    """
+    Parameters for alpha/beta/gamma loading function.
+
+    Units
+    - a0, a_age, a_term, a_sex: alpha components (per 1 sum assured)
+    - b0, b_age, b_term, b_sex: beta components (per 1 sum assured)
+    - g0, g_term: gamma components (rate)
+    """
+
+    a0: float
+    a_age: float
+    a_term: float
+    a_sex: float
+    b0: float
+    b_age: float
+    b_term: float
+    b_sex: float
+    g0: float
+    g_term: float
+
+
+@dataclass(frozen=True)
+class LoadingParameters:
+    """
+    Generated alpha/beta/gamma loading parameters.
+
+    Units
+    - alpha, beta: per 1 sum assured
+    - gamma: rate
+    """
+
+    alpha: float
+    beta: float
+    gamma: float
+
+
+@dataclass(frozen=True)
 class EndowmentPremiums:
     """
     Endowment calculation results.
@@ -44,6 +82,33 @@ class EndowmentPremiums:
     net_annual_premium: int
     gross_annual_premium: int
     monthly_premium: int
+
+
+def calc_loading_parameters(
+    params: LoadingFunctionParams,
+    issue_age: int,
+    term_years: int,
+    sex: str,
+) -> LoadingParameters:
+    """
+    Generate alpha/beta/gamma for the model point.
+
+    Units
+    - issue_age: years
+    - term_years: years
+    - sex: "male" / "female"
+    - params are function coefficients (not a premium scaling factor)
+    """
+    sex_indicator = 1.0 if sex == "female" else 0.0
+    age_delta = float(issue_age - 30)
+    term_delta = float(term_years - 10)
+
+    alpha = params.a0 + params.a_age * age_delta + params.a_term * term_delta + params.a_sex * sex_indicator
+    beta = params.b0 + params.b_age * age_delta + params.b_term * term_delta + params.b_sex * sex_indicator
+    gamma_raw = params.g0 + params.g_term * term_delta
+    gamma = min(max(gamma_raw, 0.0), 0.5)
+
+    return LoadingParameters(alpha=alpha, beta=beta, gamma=gamma)
 
 
 def calc_endowment_factors(
