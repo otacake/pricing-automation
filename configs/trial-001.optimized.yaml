@@ -1,0 +1,177 @@
+run:
+  run_id: trial-001
+  as_of: '2026-01-11'
+product:
+  type: endowment
+  term_years: 35
+  premium_paying_years: 35
+  sum_assured: 3000000
+  premium_mode: annual
+model_points:
+- issue_age: 30
+  sex: male
+  term_years: 35
+  premium_paying_years: 35
+- issue_age: 40
+  sex: male
+  term_years: 25
+  premium_paying_years: 25
+- issue_age: 50
+  sex: male
+  term_years: 20
+  premium_paying_years: 20
+- issue_age: 60
+  sex: male
+  term_years: 10
+  premium_paying_years: 10
+- issue_age: 30
+  sex: female
+  term_years: 35
+  premium_paying_years: 35
+- issue_age: 40
+  sex: female
+  term_years: 25
+  premium_paying_years: 25
+- issue_age: 50
+  sex: female
+  term_years: 20
+  premium_paying_years: 20
+- issue_age: 60
+  sex: female
+  term_years: 10
+  premium_paying_years: 10
+pricing:
+  interest:
+    type: flat
+    flat_rate: 0.01
+  mortality_path: data/mortality_pricing.csv
+  lapse:
+    annual_rate: 0.0
+loading_function:
+  params:
+    a0: 0.03
+    a_age: 0.0
+    a_term: 0.0
+    a_sex: 0.0
+    b0: 0.007
+    b_age: 0.0
+    b_term: 0.0
+    b_sex: 0.0
+    g0: 0.03
+    g_term: 0.0
+profit_test:
+  discount_curve_path: data/spot_curve_actual.csv
+  mortality_actual_path: data/mortality_actual.csv
+  expense_model:
+    mode: company
+    company_data_path: data/company_expense.csv
+    year: 2025
+    overhead_split:
+      acquisition: 0.5
+      maintenance: 0.5
+constraints:
+  irr_min: 0.08
+  warn_premium_to_maturity: true
+expense_sufficiency:
+  method: pv_loading_minus_expense
+  threshold: 0.0
+optimization:
+  irr_hard: 0.04
+  irr_target: 0.06
+  loading_surplus_hard: 0.0
+  loading_surplus_hard_ratio: -0.1
+  premium_to_maturity_hard_max: 1.05
+  premium_to_maturity_target: 1.0
+  nbv_hard: 0.0
+  stages:
+  - name: base
+    variables:
+    - a0
+    - b0
+    - g0
+  - name: age_term
+    variables:
+    - a0
+    - b0
+    - g0
+    - a_age
+    - a_term
+    - b_age
+    - b_term
+    - g_term
+  - name: sex
+    variables:
+    - a0
+    - b0
+    - g0
+    - a_age
+    - a_term
+    - b_age
+    - b_term
+    - g_term
+    - a_sex
+    - b_sex
+  bounds:
+    a0:
+      min: 0.0
+      max: 0.1
+      step: 0.002
+    a_age:
+      min: -0.005
+      max: 0.005
+      step: 0.0005
+    a_term:
+      min: -0.005
+      max: 0.005
+      step: 0.0005
+    a_sex:
+      min: -0.01
+      max: 0.01
+      step: 0.001
+    b0:
+      min: 0.0
+      max: 0.05
+      step: 0.001
+    b_age:
+      min: -0.002
+      max: 0.002
+      step: 0.0002
+    b_term:
+      min: -0.002
+      max: 0.002
+      step: 0.0002
+    b_sex:
+      min: -0.01
+      max: 0.01
+      step: 0.001
+    g0:
+      min: 0.0
+      max: 0.2
+      step: 0.005
+    g_term:
+      min: -0.02
+      max: 0.02
+      step: 0.002
+  l2_lambda: 0.1
+  max_iterations_per_stage: 5000
+outputs:
+  excel_path: out/result_trial-001.xlsx
+  log_path: out/result_trial-001.log
+  optimized_config_path: configs/trial-001.optimized.yaml
+loading_parameters:
+  a0: 0.001999999999999986
+  a_age: 0.0
+  a_term: -0.0035
+  a_sex: -0.001
+  b0: 0.007
+  b_age: 0.0
+  b_term: 0.0
+  b_sex: 0.0
+  g0: 0.03
+  g_term: 0.0
+optimize_summary:
+  min_irr: 0.020659547562787997
+  min_loading_surplus: -262572.07119621243
+  max_premium_to_maturity: 1.0911166666666667
+  iterations: 150
+  success: false

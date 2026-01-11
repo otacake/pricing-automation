@@ -206,9 +206,43 @@ def test_profit_test_against_excel() -> None:
     finally:
         wb.close()
 
-    config_path = REPO_ROOT / "configs" / "trial-001.yaml"
-    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
-    result = run_profit_test(config, base_dir=REPO_ROOT)
+    wb = _load_workbook_or_skip()
+    try:
+        ws_master = _get_sheet(wb, "マスタ")
+        issue_age = _require_int(ws_master["C2"].value, "issue age")
+        sex = _sex_from_master(ws_master["C3"].value)
+        term_years = _require_int(ws_master["C4"].value, "term years")
+        premium_paying_years = _require_int(ws_master["C5"].value, "premium paying years")
+        sum_assured = _require_int(ws_master["C6"].value, "sum assured")
+        interest_rate = _require_float(ws_master["C8"].value, "interest rate")
+        alpha = _require_float(ws_master["C14"].value, "alpha")
+        beta = _require_float(ws_master["C15"].value, "beta")
+        gamma = _require_float(ws_master["C16"].value, "gamma")
+    finally:
+        wb.close()
 
-    assert math.isclose(result.irr, expected_irr, abs_tol=1e-9)
-    assert math.isclose(result.new_business_value, expected_nbv, abs_tol=1e-6)
+    config = {
+        "product": {
+            "type": "endowment",
+            "term_years": term_years,
+            "premium_paying_years": premium_paying_years,
+            "sum_assured": sum_assured,
+            "premium_mode": "annual",
+        },
+        "model_point": {"issue_age": issue_age, "sex": sex},
+        "pricing": {
+            "interest": {"type": "flat", "flat_rate": interest_rate},
+            "mortality_path": "data/mortality_pricing.csv",
+        },
+        "loading_alpha_beta_gamma": {"alpha": alpha, "beta": beta, "gamma": gamma},
+        "profit_test": {
+            "discount_curve_path": "data/spot_curve_actual.csv",
+            "mortality_actual_path": "data/mortality_actual.csv",
+            "expense_model": {"mode": "loading"},
+        },
+    }
+    result = run_profit_test(config, base_dir=REPO_ROOT)
+    single = result.results[0]
+
+    assert math.isclose(single.irr, expected_irr, abs_tol=1e-9)
+    assert math.isclose(single.new_business_value, expected_nbv, abs_tol=1e-6)
