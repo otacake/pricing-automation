@@ -1,0 +1,44 @@
+run:
+  run_id: "trial-001"
+  as_of: "2026-01-11"
+
+product:
+  type: "endowment"
+  term_years: 28
+  premium_paying_years: 28
+  sum_assured: 10000000
+  premium_mode: "annual"
+
+model_point:
+  issue_age: 37
+  sex: "male"
+
+pricing:
+  interest:
+    type: "flat"
+    flat_rate: 0.01
+  mortality_path: "data/mortality_pricing.csv"
+  lapse:
+    annual_rate: 0.0
+
+loading_alpha_beta_gamma:
+  alpha: 0.03
+  beta: 0.007
+  gamma: 0.03
+
+profit_test:
+  discount_curve_path: "data/spot_curve_actual.csv"
+  mortality_actual_path: "data/mortality_actual.csv"
+  expense_model:
+    company_data_path: "data/company_expense.csv"
+    allocation_rule:
+      acquisition_fixed_basis: "new_policies"
+      maintenance_fixed_basis: "inforce_avg"
+      collection_fixed_basis: "premium_income"
+    include_overhead_as:
+      acquisition: 0.5
+      maintenance: 0.5
+
+outputs:
+  excel_path: "out/result_trial-001.xlsx"
+  log_path: "out/result_trial-001.log"
