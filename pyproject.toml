@@ -1,0 +1,13 @@
+[project]
+name = "pricing-automation"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+  "pyyaml>=6.0",
+  "pandas>=2.2",
+  "numpy>=2.0",
+  "openpyxl>=3.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
