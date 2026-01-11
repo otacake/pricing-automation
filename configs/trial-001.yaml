@@ -95,6 +95,7 @@ outputs:
   log_path: "out/result_trial-001.log"
 
 optimization:
+  # 免除（成立不能点の除外）
   exemption:
     enabled: true
     method: "sweep_ptm"
@@ -104,8 +105,16 @@ optimization:
       step: 0.01
       irr_threshold: 0.00
 
-  irr_hard: 0.02
-  irr_target: 0.06
+  # 目標（必要に応じて変更）
+  irr_hard: 0.07
+  irr_target: 0.08
+
+  # 十分性（例：-10%まで許容）
   loading_surplus_hard_ratio: -0.10
+
+  # P≦Sの強制（例：1.05）
   premium_to_maturity_hard_max: 1.05
+  premium_to_maturity_target: 1.00
+
+  # NBVはゼロ以上を必須
   nbv_hard: 0.0
