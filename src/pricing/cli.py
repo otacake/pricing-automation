@@ -13,6 +13,7 @@ from .config import load_optimization_settings, loading_surplus_threshold, read_
 from .optimize import optimize_loading_parameters, write_optimized_config  # 最適化の実行と結果保存に使うため
 from .outputs import write_optimize_log, write_profit_test_excel, write_profit_test_log  # 出力ファイル生成に使うため
 from .profit_test import run_profit_test  # 収益性検証の本体を呼び出すため
+from .report_feasibility import report_feasibility_from_config  # Feasibility report generation
 from .sweep_ptm import sweep_premium_to_maturity, sweep_premium_to_maturity_all  # premium-to-maturityのスイープ処理を呼ぶため
 
 
@@ -271,6 +272,15 @@ def main(argv: list[str] | None = None) -> int:  # CLIのメイン処理を実�
     sweep_parser.add_argument("--premium-to-maturity-hard-max", type=float, default=1.05)  # PTM上限
     sweep_parser.add_argument("--out", type=str, default=None)  # 出力先の指定
 
+    report_parser = subparsers.add_parser(
+        "report-feasibility", help="Generate feasibility report deck."
+    )
+    report_parser.add_argument("config", type=str, help="Path to config YAML.")
+    report_parser.add_argument("--r-start", type=float, default=1.0)
+    report_parser.add_argument("--r-end", type=float, default=1.05)
+    report_parser.add_argument("--r-step", type=float, default=0.01)
+    report_parser.add_argument("--irr-threshold", type=float, default=0.04)
+    report_parser.add_argument("--out", type=str, default="out/feasibility_deck.yaml")
     args = parser.parse_args(argv)  # CLI引数を解析する
     if args.command == "run":  # runコマンドの場合
         return run_from_config(Path(args.config))  # run処理を実行する
@@ -291,6 +301,17 @@ def main(argv: list[str] | None = None) -> int:  # CLIのメイン処理を実�
             all_model_points=bool(args.all_model_points),  # 全モデルポイントフラグ
         )  # sweep-ptmを実行する
 
+    if args.command == "report-feasibility":  # report-feasibility command
+        output_path = report_feasibility_from_config(
+            Path(args.config),
+            r_start=float(args.r_start),
+            r_end=float(args.r_end),
+            r_step=float(args.r_step),
+            irr_threshold=float(args.irr_threshold),
+            out_path=Path(args.out),
+        )
+        print(f"wrote: {output_path}")
+        return 0
     return 1  # 未知のコマンドは異常終了として扱う
 
 

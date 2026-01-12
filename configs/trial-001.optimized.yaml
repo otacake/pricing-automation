@@ -79,7 +79,22 @@ optimization:
   watch_model_point_ids:
   - male_age50_term20
   premium_to_maturity_hard_max: 1.05
-  premium_to_maturity_soft_min: 1.01
+  premium_to_maturity_soft_min: 1.02
+  bounds:
+    a_age:
+      step: 0.0002
+    a_term:
+      step: 0.0002
+    a_sex:
+      step: 0.0005
+    b_age:
+      step: 0.0001
+    b_term:
+      step: 0.0001
+    b_sex:
+      step: 0.0005
+    g_term:
+      step: 0.001
   loading_surplus_hard_ratio: -0.1
   nbv_hard: 0.0
   irr_hard: 0.0
@@ -88,8 +103,8 @@ optimization:
 loading_parameters:
   a0: 0.001999999999999986
   a_age: 0.0
-  a_term: -0.002
-  a_sex: -0.001
+  a_term: -0.0012000000000000001
+  a_sex: -0.0005
   b0: 0.005
   b_age: 0.0
   b_term: 0.0
@@ -97,8 +112,8 @@ loading_parameters:
   g0: 0.03
   g_term: 0.0
 optimize_summary:
-  min_irr: 0.015781950543319344
-  min_loading_surplus: -245794.86194546812
-  max_premium_to_maturity: 1.0621533333333333
-  iterations: 5092
+  min_irr: 0.017035184400258398
+  min_loading_surplus: -210450.59537915638
+  max_premium_to_maturity: 1.0716266666666667
+  iterations: 5146
   success: true
