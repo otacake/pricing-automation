@@ -1,0 +1,432 @@
+meta:
+  generated_at: '2026-01-12T14:00:09+00:00'
+  config_path: out\sensitivity_lapse_down.yaml
+  scan:
+    r_start: 1.0
+    r_end: 1.05
+    r_step: 0.01
+    irr_threshold: 0.06
+    r_count: 6
+  assumptions:
+    pricing_interest_rate: 0.01
+    valuation_interest_rate: 0.0025
+    lapse_rate: 0.027
+    loading_alpha_beta_gamma:
+      alpha: 0.03
+      beta: 0.007
+      gamma: 0.03
+  constraints:
+    irr_hard: 0.0
+    nbv_hard: 0.0
+    loading_surplus_hard: 0.0
+    loading_surplus_hard_ratio: -0.1
+    premium_to_maturity_hard_max: 1.05
+  model_points:
+    count: 7
+    ids:
+    - male_age30_term35
+    - male_age40_term25
+    - male_age50_term20
+    - female_age30_term35
+    - female_age40_term25
+    - female_age50_term20
+    - female_age60_term10
+  fixed_point:
+    r: 1.05
+kpi_summary: &id001
+  model_point_count: 7
+  sweep_row_count: 42
+  min_r_found: 7
+  min_r_not_found: 0
+  min_irr: -0.10314732692635536
+  max_irr: 0.10123044593777628
+  min_nbv: -74206.6414842124
+  max_nbv: 174967.484863785
+  min_loading_surplus_ratio: -0.09279404719409712
+  max_loading_surplus_ratio: -0.02974432658027539
+  min_premium_to_maturity: 0.9999966666666666
+  max_premium_to_maturity: 1.05
+slides:
+- title: Conclusion
+  kind: kpi_summary
+  table: *id001
+- title: Min r by Model Point
+  kind: min_r_table
+  table:
+  - model_point_id: male_age30_term35
+    min_r: 1.04
+    found: true
+  - model_point_id: male_age40_term25
+    min_r: 1.02
+    found: true
+  - model_point_id: male_age50_term20
+    min_r: 1.04
+    found: true
+  - model_point_id: female_age30_term35
+    min_r: 1.02
+    found: true
+  - model_point_id: female_age40_term25
+    min_r: 1.01
+    found: true
+  - model_point_id: female_age50_term20
+    min_r: 1.02
+    found: true
+  - model_point_id: female_age60_term10
+    min_r: 1.05
+    found: true
+- title: Constraint Violations at r=1.05
+  kind: constraint_breakdown
+  r: 1.05
+  table:
+  - model_point_id: male_age30_term35
+    r: 1.05
+    irr: 0.0680467044289787
+    nbv: 148810.16993004023
+    loading_surplus_ratio: -0.0581170744313541
+    premium_to_maturity: 1.05
+    violations: []
+    status: pass
+  - model_point_id: male_age40_term25
+    r: 1.05
+    irr: 0.08318089152852484
+    nbv: 147745.6481246277
+    loading_surplus_ratio: -0.05393063648093736
+    premium_to_maturity: 1.05
+    violations: []
+    status: pass
+  - model_point_id: male_age50_term20
+    r: 1.05
+    irr: 0.07062632317623646
+    nbv: 95986.85831885584
+    loading_surplus_ratio: -0.06156375510523154
+    premium_to_maturity: 1.05
+    violations: []
+    status: pass
+  - model_point_id: female_age30_term35
+    r: 1.05
+    irr: 0.07353895668084046
+    nbv: 168304.24885470993
+    loading_surplus_ratio: -0.05333024088077719
+    premium_to_maturity: 1.05
+    violations: []
+    status: pass
+  - model_point_id: female_age40_term25
+    r: 1.05
+    irr: 0.09434222231482425
+    nbv: 174967.484863785
+    loading_surplus_ratio: -0.0474610874456747
+    premium_to_maturity: 1.05
+    violations: []
+    status: pass
+  - model_point_id: female_age50_term20
+    r: 1.05
+    irr: 0.10123044593777628
+    nbv: 154286.7573702664
+    loading_surplus_ratio: -0.0483577860899623
+    premium_to_maturity: 1.05
+    violations: []
+    status: pass
+  - model_point_id: female_age60_term10
+    r: 1.05
+    irr: 0.09830963505125362
+    nbv: 46862.01325649879
+    loading_surplus_ratio: -0.02974432658027539
+    premium_to_maturity: 1.05
+    violations: []
+    status: pass
+tables:
+  sweep:
+  - model_point_id: male_age30_term35
+    r: 1.0
+    gross_annual_premium: 85714
+    irr: 0.04674421527367652
+    nbv: 77354.41498198947
+    loading_surplus_ratio: -0.08141502731061327
+    premium_to_maturity: 0.9999966666666666
+  - model_point_id: male_age40_term25
+    r: 1.0
+    gross_annual_premium: 120000
+    irr: 0.04675026697017971
+    nbv: 60554.87112747913
+    loading_surplus_ratio: -0.08239646996604978
+    premium_to_maturity: 1.0
+  - model_point_id: male_age50_term20
+    r: 1.0
+    gross_annual_premium: 150000
+    irr: 0.022977307249379207
+    nbv: 421.43945360447833
+    loading_surplus_ratio: -0.09279404719409712
+    premium_to_maturity: 1.0
+  - model_point_id: female_age30_term35
+    r: 1.0
+    gross_annual_premium: 85714
+    irr: 0.05171990227723436
+    nbv: 96428.47668213648
+    loading_surplus_ratio: -0.0767642495520589
+    premium_to_maturity: 0.9999966666666666
+  - model_point_id: female_age40_term25
+    r: 1.0
+    gross_annual_premium: 120000
+    irr: 0.05660118281752502
+    nbv: 87054.94230459555
+    loading_surplus_ratio: -0.07616089204920137
+    premium_to_maturity: 1.0
+  - model_point_id: female_age50_term20
+    r: 1.0
+    gross_annual_premium: 150000
+    irr: 0.04938905686836194
+    nbv: 57013.74541890572
+    loading_surplus_ratio: -0.08014159438665767
+    premium_to_maturity: 1.0
+  - model_point_id: female_age60_term10
+    r: 1.0
+    gross_annual_premium: 300000
+    irr: -0.10314732692635536
+    nbv: -74206.6414842124
+    loading_surplus_ratio: -0.0695289966354897
+    premium_to_maturity: 1.0
+  - model_point_id: male_age30_term35
+    r: 1.01
+    gross_annual_premium: 86571
+    irr: 0.05077339070667959
+    nbv: 91642.23159199407
+    loading_surplus_ratio: -0.0767565239000848
+    premium_to_maturity: 1.009995
+  - model_point_id: male_age40_term25
+    r: 1.01
+    gross_annual_premium: 121200
+    irr: 0.05359597450740283
+    nbv: 77993.0265269088
+    loading_surplus_ratio: -0.07670330326902727
+    premium_to_maturity: 1.01
+  - model_point_id: male_age50_term20
+    r: 1.01
+    gross_annual_premium: 151500
+    irr: 0.03193813578164205
+    nbv: 19534.523226654637
+    loading_surplus_ratio: -0.086547988776324
+    premium_to_maturity: 1.01
+  - model_point_id: female_age30_term35
+    r: 1.01
+    gross_annual_premium: 86571
+    irr: 0.05583428452459967
+    nbv: 110800.27713754834
+    loading_surplus_ratio: -0.07207854133197295
+    premium_to_maturity: 1.009995
+  - model_point_id: female_age40_term25
+    r: 1.01
+    gross_annual_premium: 121200
+    irr: 0.06364916274112514
+    nbv: 104637.4508164335
+    loading_surplus_ratio: -0.07042093112849604
+    premium_to_maturity: 1.01
+  - model_point_id: female_age50_term20
+    r: 1.01
+    gross_annual_premium: 151500
+    irr: 0.05898651943824969
+    nbv: 76468.3478091778
+    loading_surplus_ratio: -0.07378483272731855
+    premium_to_maturity: 1.01
+  - model_point_id: female_age60_term10
+    r: 1.01
+    gross_annual_premium: 303000
+    irr: -0.0654742546426324
+    nbv: -49992.91053607031
+    loading_surplus_ratio: -0.06157206262444683
+    premium_to_maturity: 1.01
+  - model_point_id: male_age30_term35
+    r: 1.02
+    gross_annual_premium: 87429
+    irr: 0.054913233627943786
+    nbv: 105946.72010002659
+    loading_surplus_ratio: -0.07209258466293958
+    premium_to_maturity: 1.020005
+  - model_point_id: male_age40_term25
+    r: 1.02
+    gross_annual_premium: 122400
+    irr: 0.060637777586272354
+    nbv: 95431.18192633856
+    loading_surplus_ratio: -0.07101013657200488
+    premium_to_maturity: 1.02
+  - model_point_id: male_age50_term20
+    r: 1.02
+    gross_annual_premium: 153000
+    irr: 0.04114649498574423
+    nbv: 38647.60699970506
+    loading_surplus_ratio: -0.08030193035855089
+    premium_to_maturity: 1.02
+  - model_point_id: female_age30_term35
+    r: 1.02
+    gross_annual_premium: 87429
+    irr: 0.06006780087950529
+    nbv: 125188.84748847417
+    loading_surplus_ratio: -0.06738736554103503
+    premium_to_maturity: 1.020005
+  - model_point_id: female_age40_term25
+    r: 1.02
+    gross_annual_premium: 122400
+    irr: 0.070920229611839
+    nbv: 122219.9593282713
+    loading_surplus_ratio: -0.06468097020779069
+    premium_to_maturity: 1.02
+  - model_point_id: female_age50_term20
+    r: 1.02
+    gross_annual_premium: 153000
+    irr: 0.0689212613230718
+    nbv: 95922.95019944996
+    loading_surplus_ratio: -0.06742807106797946
+    premium_to_maturity: 1.02
+  - model_point_id: female_age60_term10
+    r: 1.02
+    gross_annual_premium: 306000
+    irr: -0.02704331015701137
+    nbv: -25779.179587927985
+    loading_surplus_ratio: -0.05361512861340395
+    premium_to_maturity: 1.02
+  - model_point_id: male_age30_term35
+    r: 1.03
+    gross_annual_premium: 88286
+    irr: 0.05916306851152661
+    nbv: 120234.53671003119
+    loading_surplus_ratio: -0.0674340812524111
+    premium_to_maturity: 1.0300033333333334
+  - model_point_id: male_age40_term25
+    r: 1.03
+    gross_annual_premium: 123600
+    irr: 0.06789859200664469
+    nbv: 112869.33732576825
+    loading_surplus_ratio: -0.06531696987498234
+    premium_to_maturity: 1.03
+  - model_point_id: male_age50_term20
+    r: 1.03
+    gross_annual_premium: 154500
+    irr: 0.05063733803799904
+    nbv: 57760.69077275533
+    loading_surplus_ratio: -0.07405587194077777
+    premium_to_maturity: 1.03
+  - model_point_id: female_age30_term35
+    r: 1.03
+    gross_annual_premium: 88286
+    irr: 0.0644202054383537
+    nbv: 139560.64794388617
+    loading_surplus_ratio: -0.06270165732094911
+    premium_to_maturity: 1.0300033333333334
+  - model_point_id: female_age40_term25
+    r: 1.03
+    gross_annual_premium: 123600
+    irr: 0.07843998179735645
+    nbv: 139802.46784010928
+    loading_surplus_ratio: -0.05894100928708531
+    premium_to_maturity: 1.03
+  - model_point_id: female_age50_term20
+    r: 1.03
+    gross_annual_premium: 154500
+    irr: 0.07923840555922004
+    nbv: 115377.55258972218
+    loading_surplus_ratio: -0.06107130940864043
+    premium_to_maturity: 1.03
+  - model_point_id: female_age60_term10
+    r: 1.03
+    gross_annual_premium: 309000
+    irr: 0.012668205376181275
+    nbv: -1565.4486397858273
+    loading_surplus_ratio: -0.04565819460236111
+    premium_to_maturity: 1.03
+  - model_point_id: male_age30_term35
+    r: 1.04
+    gross_annual_premium: 89143
+    irr: 0.063537373669106
+    nbv: 134522.35332003568
+    loading_surplus_ratio: -0.06277557784188258
+    premium_to_maturity: 1.0400016666666667
+  - model_point_id: male_age40_term25
+    r: 1.04
+    gross_annual_premium: 124800
+    irr: 0.07540365391921197
+    nbv: 130307.49272519803
+    loading_surplus_ratio: -0.05962380317795982
+    premium_to_maturity: 1.04
+  - model_point_id: male_age50_term20
+    r: 1.04
+    gross_annual_premium: 156000
+    irr: 0.06044947728889437
+    nbv: 76873.77454580556
+    loading_surplus_ratio: -0.06780981352300469
+    premium_to_maturity: 1.04
+  - model_point_id: female_age30_term35
+    r: 1.04
+    gross_annual_premium: 89143
+    irr: 0.068906803535041
+    nbv: 153932.44839929807
+    loading_surplus_ratio: -0.05801594910086302
+    premium_to_maturity: 1.0400016666666667
+  - model_point_id: female_age40_term25
+    r: 1.04
+    gross_annual_premium: 124800
+    irr: 0.08623678666516774
+    nbv: 157384.9763519472
+    loading_surplus_ratio: -0.05320104836637998
+    premium_to_maturity: 1.04
+  - model_point_id: female_age50_term20
+    r: 1.04
+    gross_annual_premium: 156000
+    irr: 0.08998886624309457
+    nbv: 134832.15497999417
+    loading_surplus_ratio: -0.05471454774930135
+    premium_to_maturity: 1.04
+  - model_point_id: female_age60_term10
+    r: 1.04
+    gross_annual_premium: 312000
+    irr: 0.0542333419821069
+    nbv: 22648.282308356356
+    loading_surplus_ratio: -0.03770126059131826
+    premium_to_maturity: 1.04
+  - model_point_id: male_age30_term35
+    r: 1.05
+    gross_annual_premium: 90000
+    irr: 0.0680467044289787
+    nbv: 148810.16993004023
+    loading_surplus_ratio: -0.0581170744313541
+    premium_to_maturity: 1.05
+  - model_point_id: male_age40_term25
+    r: 1.05
+    gross_annual_premium: 126000
+    irr: 0.08318089152852484
+    nbv: 147745.6481246277
+    loading_surplus_ratio: -0.05393063648093736
+    premium_to_maturity: 1.05
+  - model_point_id: male_age50_term20
+    r: 1.05
+    gross_annual_premium: 157500
+    irr: 0.07062632317623646
+    nbv: 95986.85831885584
+    loading_surplus_ratio: -0.06156375510523154
+    premium_to_maturity: 1.05
+  - model_point_id: female_age30_term35
+    r: 1.05
+    gross_annual_premium: 90000
+    irr: 0.07353895668084046
+    nbv: 168304.24885470993
+    loading_surplus_ratio: -0.05333024088077719
+    premium_to_maturity: 1.05
+  - model_point_id: female_age40_term25
+    r: 1.05
+    gross_annual_premium: 126000
+    irr: 0.09434222231482425
+    nbv: 174967.484863785
+    loading_surplus_ratio: -0.0474610874456747
+    premium_to_maturity: 1.05
+  - model_point_id: female_age50_term20
+    r: 1.05
+    gross_annual_premium: 157500
+    irr: 0.10123044593777628
+    nbv: 154286.7573702664
+    loading_surplus_ratio: -0.0483577860899623
+    premium_to_maturity: 1.05
+  - model_point_id: female_age60_term10
+    r: 1.05
+    gross_annual_premium: 315000
+    irr: 0.09830963505125362
+    nbv: 46862.01325649879
+    loading_surplus_ratio: -0.02974432658027539
+    premium_to_maturity: 1.05
