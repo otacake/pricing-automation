@@ -9,6 +9,7 @@
 - Run `python -m pytest -q` before any optimize/run workflow.
 - Prefer the default config `configs/trial-001.yaml` unless a task specifies another.
 - Avoid destructive commands and keep output files under `out/`.
+- When running a PDCA cycle, always update `reports/feasibility_report.md` with the final alpha/beta/gamma formulas, their coefficients, and per-model-point calculations including intermediate steps.
 
 ## Reporting Format
 - Summary of what was done.
