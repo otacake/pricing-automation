@@ -80,6 +80,38 @@ min_rがr_endに張り付く点は2件（male_age50_term20, female_age60_term10�
 |g0|0.03|
 |g_term|0.0|
 
+### モデルポイント別のalpha/beta/gamma計算（途中式）
+定義: `age_delta = issue_age - 30`, `term_delta = term_years - 10`, `sex_indicator = 1.0 if female else 0.0`。
+
+- male_age30_term35（age_delta=0, term_delta=25, sex_indicator=0）
+  - alpha = 0.002000 + 0.000000*0.0 + (-0.001200)*25.0 + (-0.000500)*0.0 = -0.028000
+  - beta  = 0.005000 + 0.000000*0.0 + 0.000000*25.0 + 0.000000*0.0 = 0.005000
+  - gamma = clamp(0.030000 + 0.000000*25.0, 0, 0.5) = 0.030000
+- male_age40_term25（age_delta=10, term_delta=15, sex_indicator=0）
+  - alpha = 0.002000 + 0.000000*10.0 + (-0.001200)*15.0 + (-0.000500)*0.0 = -0.016000
+  - beta  = 0.005000 + 0.000000*10.0 + 0.000000*15.0 + 0.000000*0.0 = 0.005000
+  - gamma = clamp(0.030000 + 0.000000*15.0, 0, 0.5) = 0.030000
+- male_age50_term20（age_delta=20, term_delta=10, sex_indicator=0）
+  - alpha = 0.002000 + 0.000000*20.0 + (-0.001200)*10.0 + (-0.000500)*0.0 = -0.010000
+  - beta  = 0.005000 + 0.000000*20.0 + 0.000000*10.0 + 0.000000*0.0 = 0.005000
+  - gamma = clamp(0.030000 + 0.000000*10.0, 0, 0.5) = 0.030000
+- female_age30_term35（age_delta=0, term_delta=25, sex_indicator=1）
+  - alpha = 0.002000 + 0.000000*0.0 + (-0.001200)*25.0 + (-0.000500)*1.0 = -0.028500
+  - beta  = 0.005000 + 0.000000*0.0 + 0.000000*25.0 + 0.000000*1.0 = 0.005000
+  - gamma = clamp(0.030000 + 0.000000*25.0, 0, 0.5) = 0.030000
+- female_age40_term25（age_delta=10, term_delta=15, sex_indicator=1）
+  - alpha = 0.002000 + 0.000000*10.0 + (-0.001200)*15.0 + (-0.000500)*1.0 = -0.016500
+  - beta  = 0.005000 + 0.000000*10.0 + 0.000000*15.0 + 0.000000*1.0 = 0.005000
+  - gamma = clamp(0.030000 + 0.000000*15.0, 0, 0.5) = 0.030000
+- female_age50_term20（age_delta=20, term_delta=10, sex_indicator=1）
+  - alpha = 0.002000 + 0.000000*20.0 + (-0.001200)*10.0 + (-0.000500)*1.0 = -0.010500
+  - beta  = 0.005000 + 0.000000*20.0 + 0.000000*10.0 + 0.000000*1.0 = 0.005000
+  - gamma = clamp(0.030000 + 0.000000*10.0, 0, 0.5) = 0.030000
+- female_age60_term10（age_delta=30, term_delta=0, sex_indicator=1）
+  - alpha = 0.002000 + 0.000000*30.0 + (-0.001200)*0.0 + (-0.000500)*1.0 = 0.001500
+  - beta  = 0.005000 + 0.000000*30.0 + 0.000000*0.0 + 0.000000*1.0 = 0.005000
+  - gamma = clamp(0.030000 + 0.000000*0.0, 0, 0.5) = 0.030000
+
 ### キャッシュフロー分解（年次）
 - 保険料収入: `premium_income = gross_annual_premium * inforce_begin`（払込期間のみ）
 - 純保険料収入: `net_premium_income = net_annual_premium * inforce_begin`
@@ -92,5 +124,5 @@ min_rがr_endに張り付く点は2件（male_age50_term20, female_age60_term10�
 - 指標: `IRR = irr(net_cf系列)`, `NBV = sum(pv_net_cf)`
 
 ## 次の実験案
-1) python -m pricing.cli report-feasibility configs/trial-001.yaml --r-start 0.98 --r-end 1.08 --r-step 0.005 --irr-threshold 0.06 --out out/feasibility_deck_wide_irr06.yaml
-2) python -m pricing.cli report-feasibility configs/trial-001.yaml --r-start 1.00 --r-end 1.05 --r-step 0.005 --irr-threshold 0.07 --out out/feasibility_deck_irr07_cap105.yaml
+1) python -m pricing.cli report-feasibility configs/trial-001.yaml --r-start 1.00 --r-end 1.06 --r-step 0.005 --irr-threshold 0.06 --out out/feasibility_deck_cap106_irr06.yaml
+2) python -m pricing.cli report-feasibility configs/trial-001.yaml --r-start 1.00 --r-end 1.05 --r-step 0.005 --irr-threshold 0.065 --out out/feasibility_deck_irr065_cap105.yaml
