@@ -10,6 +10,7 @@
 - Prefer the default config `configs/trial-001.yaml` unless a task specifies another.
 - Avoid destructive commands and keep output files under `out/`.
 - When running a PDCA cycle, always update `reports/feasibility_report.md` with the final alpha/beta/gamma formulas, their coefficients, and per-model-point calculations including intermediate steps.
+- Do not allow negative planned expense assumptions in the company expense model; treat any negative values as errors and stop.
 
 ## Reporting Format
 - Summary of what was done.

@@ -31,14 +31,14 @@ def _make_result(  # テスト用のProfitTestResultを作る補助関数
         premium_paying_years=10,  # 払込期間
         sum_assured=1_000_000,  # 保険金額
     )  # モデルポイント
-    loadings = LoadingParameters(alpha=0.0, beta=0.0, gamma=0.0)  # ダミーのloading
+    loadings = LoadingParameters(alpha=0.001, beta=0.0, gamma=0.0)  # ダミーのloading
     premiums = EndowmentPremiums(  # ダミーの保険料計算結果
         A=1.0,  # A
         a=1.0,  # a
         net_rate=0.1,  # 純保険料率
-        gross_rate=0.1,  # 総保険料率
+        gross_rate=0.12,  # 総保険料率
         net_annual_premium=100,  # 純保険料
-        gross_annual_premium=100,  # 総保険料
+        gross_annual_premium=120,  # 総保険料
         monthly_premium=10,  # 月払
     )  # 保険料結果
     cashflow = pd.DataFrame({"net_cf": [0.0]})  # ダミーのキャッシュフロー

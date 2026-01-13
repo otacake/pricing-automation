@@ -134,6 +134,37 @@ def _evaluate(  # 係数候補を評価して目的関数・制約違反を計�
                 f"{label} nbv_hard shortfall={nbv_shortfall:.2f}"
             )
 
+        alpha_shortfall = max(0.0 - res.loadings.alpha, 0.0)  # alphaの負値を検出する
+        if alpha_shortfall > 0:  # 負値ならhard違反に加算する
+            hard_violation += alpha_shortfall * alpha_shortfall  # 二乗ペナルティで加算
+            failure_details.append(  # 詳細を記録
+                f"{label} alpha_non_negative shortfall={alpha_shortfall:.6f}"
+            )
+
+        beta_shortfall = max(0.0 - res.loadings.beta, 0.0)  # betaの負値を検出する
+        if beta_shortfall > 0:  # 負値ならhard違反に加算する
+            hard_violation += beta_shortfall * beta_shortfall  # 二乗ペナルティで加算
+            failure_details.append(  # 詳細を記録
+                f"{label} beta_non_negative shortfall={beta_shortfall:.6f}"
+            )
+
+        gamma_shortfall = max(0.0 - res.loadings.gamma, 0.0)  # gammaの負値を検出する
+        if gamma_shortfall > 0:  # 負値ならhard違反に加算する
+            hard_violation += gamma_shortfall * gamma_shortfall  # 二乗ペナルティで加算
+            failure_details.append(  # 詳細を記録
+                f"{label} gamma_non_negative shortfall={gamma_shortfall:.6f}"
+            )
+
+        loading_amount = (  # 付加保険料が正かを確認する
+            res.premiums.gross_annual_premium - res.premiums.net_annual_premium
+        )
+        loading_shortfall = max(1e-12 - float(loading_amount), 0.0)  # 0以下は違反扱い
+        if loading_shortfall > 0:  # 不足があればhard違反に加算する
+            hard_violation += loading_shortfall * loading_shortfall  # 二乗ペナルティで加算
+            failure_details.append(  # 詳細を記録
+                f"{label} loading_positive shortfall={loading_shortfall:.6f}"
+            )
+
         irr_gap = max(settings.irr_target - res.irr, 0.0)  # IRR目標との差分を計算する
         irr_penalty += irr_gap * irr_gap  # ペナルティを積算する
         premium_gap = max(  # PTM目標との差分を計算する

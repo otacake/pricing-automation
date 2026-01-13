@@ -163,6 +163,9 @@ def load_company_expense_assumptions(  # 会社費用CSVから単価等を推定
     ) / inforce_avg  # 保有件数で割って単価化する
     coll_rate = float(row["coll_var_total"]) / premium_income  # 集金費率を計算する
 
+    if acq_per_policy < 0 or maint_per_policy < 0 or coll_rate < 0:  # 予定事業費は負値不可
+        raise ValueError("Company expense assumptions must be non-negative.")
+
     return ExpenseAssumptions(  # 推定結果をデータクラスにまとめて返す
         year=int(row["year"]),  # 年
         acq_per_policy=acq_per_policy,  # 獲得費単価
@@ -474,6 +477,8 @@ def _load_expense_assumptions(  # 費用モデルの設定を読み込む
         raise ValueError("company_data_path is required for company expense model.")  # エラーを出す
 
     overhead_cfg = expense_cfg.get("overhead_split", {}) if isinstance(expense_cfg, Mapping) else {}  # 共通費配賦設定
+    if not overhead_cfg:  # 旧キー互換
+        overhead_cfg = expense_cfg.get("include_overhead_as", {}) if isinstance(expense_cfg, Mapping) else {}
     overhead_split_acq = float(overhead_cfg.get("acquisition", 0.0))  # 獲得配賦比率
     overhead_split_maint = float(overhead_cfg.get("maintenance", 0.0))  # 維持配賦比率
     year = expense_cfg.get("year")  # 年度指定を取得する
