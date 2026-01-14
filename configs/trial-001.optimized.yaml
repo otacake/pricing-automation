@@ -101,19 +101,19 @@ optimization:
   objective:
     mode: maximize_min_irr
 loading_parameters:
-  a0: 0.025999999999999995
+  a0: 0.005999999999999986
   a_age: 0.0
-  a_term: -0.0016000000000000003
-  a_sex: 0.0
-  b0: 0.006
+  a_term: -0.0002
+  a_sex: 0.0005
+  b0: 0.005
   b_age: 0.0
   b_term: 0.0
   b_sex: 0.0
-  g0: 0.004999999999999995
-  g_term: -0.001
+  g0: 0.024999999999999998
+  g_term: -0.003
 optimize_summary:
-  min_irr: 0.015326181904972112
-  min_loading_surplus: -233150.8721260616
-  max_premium_to_maturity: 1.08244
-  iterations: 222
-  success: false
+  min_irr: 0.020118791904824712
+  min_loading_surplus: -206365.49659499404
+  max_premium_to_maturity: 1.0555533333333333
+  iterations: 180
+  success: true

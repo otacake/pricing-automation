@@ -3,7 +3,7 @@
 ## 結論
 - 拘束条件: premium_to_maturity_hard_max が r_end=1.05 で全モデルポイント余裕度0（拘束）。min_r時点でも male_age50_term20 と female_age60_term10 は余裕度0。
 - not found: 0件（7/7でmin_r検出）
-- 予定事業費・保険料: company費用を0.90スケールした上で最適化した loading_parameters を採用。scale=1.00/0.95 は premium_to_maturity_hard_max を満たさず、scale=0.90 で非watch全点が制約内。
+- 予定事業費・保険料: data/company_expense.csv を0.90スケールして採用した前提で最適化した loading_parameters を採用。scale=1.00/0.95 は premium_to_maturity_hard_max を満たさず、scale=0.90 で非watch全点が制約内。
 - 意思決定: rは一律倍率の診断軸であり、最終料率は alpha/beta/gamma の係数式で固定する。拘束2点は監視対象とし、前提更新時に再計算する。
 - alpha>=0 を hard 制約として課し、最小alpha=0.0010（male_age30_term35）。付加保険料は `gross_annual_premium > net_annual_premium` を満たす設計で運用する。
 
@@ -11,7 +11,7 @@
 |項目|内容|
 |---|---|
 |採用する料率式|`gross_rate = (net_rate + alpha / a + beta) / (1 - gamma)`、alpha/beta/gammaは線形式（係数は後述）|
-|予定事業費|`out/company_expense_scale_0.90.csv`（company_expense.csv を0.90スケール）|
+|予定事業費|`data/company_expense.csv`（原本を0.90スケールした値を採用）|
 |適用範囲|モデルポイント7件、r_start=1.0, r_end=1.05（rは一律倍率）|
 |拘束条件|premium_to_maturity_hard_max の余裕度=0（r_endで全点、min_rで2点）|
 |alpha/beta/gamma>=0|hard制約として設定（最小alpha=0.0010）|
@@ -21,7 +21,7 @@
 ## 上位者向け説明（意思決定の根拠）
 本レポートの目的は「IRR閾値0.06を満たすために必要な保険料倍率の範囲」を数値で特定し、制約の余裕度まで含めて意思決定に使える形へ整理することである。rは一律倍率（各モデルポイントの基準保険料に共通に乗算）であり、min_rはモデルポイントごとの診断値である。irr_threshold=0.06はmin_rを決めるための目標水準であり、irr_hard=0.0は制約の下限である。
 
-最終料率の採用に際しては、company_expense.csv をスケールして最適化を再実行した。scale=1.00/0.95 は premium_to_maturity_hard_max を満たさず、scale=0.90 で初めて非watch全点が制約内となった。以降の最終料率評価は `out/trial-001.expense_scale_0.90.optimized.yaml` に基づく。
+最終料率の採用に際しては、company_expense.csv を0.90スケールした前提で最適化を再実行した。scale=1.00/0.95 は premium_to_maturity_hard_max を満たさず、scale=0.90 で初めて非watch全点が制約内となった。以降の最終料率評価は `configs/trial-001.optimized.yaml` に基づく。
 
 KPIの最悪値（探索格子全体）は min IRR=-0.0986235910327119、min NBV=-70191.17194549802、min loading_surplus_ratio=-0.09098095313360245、max premium_to_maturity=1.05 である。制約余裕度を見ると premium_to_maturity_hard_max の余裕度は r_end=1.05 で全点0となり拘束条件である。一方、他の制約は r_end 時点でも余裕があり、最小余裕度は irr_hard で 0.0666267211728547（male_age30_term35）、loading_surplus_ratio で 0.03952236258345432（male_age50_term20）、nbv_hard で 49347.9433452091（female_age60_term10）である。
 
@@ -45,7 +45,7 @@ KPIの最悪値（探索格子全体）は min IRR=-0.0986235910327119、min NBV
 補足:
 - irr_threshold は min_r 判定に使う目標水準で、irr_hard は制約の下限（本レポートでは 0.0）。
 - r は一律倍率であり、`gross_annual_premium = round(r * sum_assured / premium_paying_years, 0)` を全モデルポイントに適用する。
-- 本レポートの sweep は `loading_alpha_beta_gamma` を固定値として用いる。最終の料率式で使う係数は `out/trial-001.expense_scale_0.90.optimized.yaml` の `loading_parameters` として後述する（company_expense 0.90スケール）。
+- 本レポートの sweep は `loading_alpha_beta_gamma` を固定値として用いる。最終の料率式で使う係数は `configs/trial-001.optimized.yaml` の `loading_parameters` として後述する（company_expense 0.90スケール前提）。
 
 ## KPIサマリー（集計点別）
 単位: IRR/ratioはrate、NBVはJPY。min_r集計は「各モデルポイントのmin_r時点」を集計した値。
@@ -91,7 +91,7 @@ feasibility sweep の r は一律倍率であり、`gross_annual_premium = round
 注記: min_rはモデルポイント別の診断値であり、rをモデルポイント別に運用する場合は料率表の区分設計（年齢・性別・期間）や再最適化が必要になる。
 
 ## 予定事業費・保険料の探索結果
-premium_to_maturity_hard_max を満たすため、company_expense.csv をスケールして最適化を再実行した。
+premium_to_maturity_hard_max を満たすため、company_expense.csv をスケールして最適化を再実行した。scale は「元の company_expense.csv」に対する倍率として整理する。
 
 |planned expense scale|optimize success (non-watch)|min premium_to_maturity_slack (non-watch)|備考|
 |---|---|---|---|
@@ -99,9 +99,9 @@ premium_to_maturity_hard_max を満たすため、company_expense.csv をスケ�
 |0.95|fail|-|premium_to_maturity_hard: male_age30_term35, male_age40_term25, female_age30_term35, female_age50_term20, female_age60_term10 / alpha_non_negative: male_age30_term35, male_age40_term25, female_age30_term35, female_age40_term25|
 |0.90|pass|0.000243 (female_age60_term10)|watch の male_age50_term20 は premium_to_maturity=1.055553|
 
-採用: scale=0.90 を予定事業費の基準として採用し、最終料率の評価は以下に示す。最適化では alpha>=0 と付加保険料正（gross_annual_premium > net_annual_premium）を hard 制約として追加した。
+採用: scale=0.90 を予定事業費の基準として採用し、最終料率の評価は以下に示す。最適化では alpha/beta/gamma>=0 と付加保険料正（gross_annual_premium > net_annual_premium）を hard 制約として追加した。
 
-## 最終料率式によるモデルポイント別結果（out/trial-001.expense_scale_0.90.optimized.yaml）
+## 最終料率式によるモデルポイント別結果（configs/trial-001.optimized.yaml）
 最終の alpha/beta/gamma 係数式で算出した年払総保険料を用い、IRR/NBV/制約余裕度を計算した。watch対象の male_age50_term20 は hard 制約評価から除外されるが、数値は参考として掲載する。
 
 |model_point_id|gross_annual_premium|irr|nbv|loading_surplus_ratio|premium_to_maturity|irr_hard_slack|nbv_hard_slack|loading_surplus_ratio_slack|premium_to_maturity_slack|
@@ -119,7 +119,7 @@ premium_to_maturity_hard_max を満たすため、company_expense.csv をスケ�
 ## 事業費の十分性の整理
 事業費の十分性は `loading_surplus` と `loading_surplus_ratio` で評価する。定義は `loading_surplus = pv_loading - pv_expense`、`loading_surplus_ratio = loading_surplus / sum_assured` であり、制約は `loading_surplus_ratio >= -0.10` である。評価は profit_test（company費用モデル）で行うべきで、feasibility sweep の `loading_alpha_beta_gamma` 固定式は事業費の十分性を直接反映しない。
 
-現行の company費用モデルでは `data/company_expense.csv` の先頭行（year=2025）から獲得費単価・維持費単価・集金費率を推定する。`profit_test.expense_model.include_overhead_as` は `overhead_split` として読み替えるよう修正済みであり、`overhead_total` は獲得/維持に配賦される。予定事業費の負値は許容せず、獲得費単価・維持費単価・集金費率が負になる場合はエラーで停止する。
+現行の company費用モデルでは `data/company_expense.csv` の先頭行（year=2025）から獲得費単価・維持費単価・集金費率を推定する。`profit_test.expense_model.include_overhead_as` は `overhead_split` として読み替えるよう修正済みであり、`overhead_total` は獲得/維持に配賦される。予定事業費の負値は許容せず、獲得費単価・維持費単価・集金費率が負になる場合はエラーで停止する。現在は company_expense.csv を0.90スケールした値を採用している。
 
 会社費用モデルの改善点として、`allocation_rule`（acquisition/maintenance/collection の配賦基準）は現行コードでは使用していない。配賦基準を厳密に反映する場合は実装対応が必要である。
 
@@ -167,6 +167,15 @@ not foundは0件で、irr_threshold=0.06はr_end=1.05内で達成可能である
 
 alpha/beta/gamma>=0 と付加保険料正を hard 制約として課したため、長期側の割引は発生しない。最小alphaは 0.0010（male_age30_term35）であり、負荷ゼロに近い点が境界になるため、前提更新時は premium_to_maturity_slack と併せて監視する。
 
+## alphaが期間で減少する妥当性（費用構造）
+alpha は獲得費を中心とした「初期費用の上乗せ」を表す前提である。長期になるほど alpha を小さくする設計が数理的に許容されるのは、以下のように費用構造が説明できる場合に限られる。
+
+- 獲得費が契約初期の固定費に近く、保険期間が長いほど「保険金額あたりの初期費用の比率」が低下する（固定費の分散）。  
+- 維持費は beta 側（年次・保有に比例）で回収する前提で、alpha を下げても総費用の回収に矛盾しない。  
+- 長期契約の価格競争や販売施策により、初期負荷を抑える合理性がある（ただし alpha>=0 を維持する）。  
+
+上記の説明が成立しない場合は、alpha を期間で減少させず、a_term>=0（もしくは0固定）の制約で再推定することが望ましい。現行の最適化では alpha>=0 を hard 制約としているため、「長期ほど alpha が小さいが負にはならない」範囲で費用構造の整合性を確保している。
+
 ## 監視運用（提案）
 - 監視指標: premium_to_maturity_slack（r_end）、min_r（モデルポイント別）、min_irr（r_end）
 - 監視頻度: 月次、または前提（利率・解約率・費用）更新時
@@ -193,7 +202,7 @@ alpha/beta/gamma>=0 と付加保険料正を hard 制約として課したため
 - 解約率の上下は min_r=r_end の対象を1件に減らすが、not foundは発生しない。
 
 ### 費用感度（profit_test, company費用モデル）
-out/company_expense_scale_0.90.csv の費用列（acq_var_total, acq_fixed_total, maint_var_total, maint_fixed_total, coll_var_total, overhead_total）を ±10% スケールし、`out/trial-001.expense_scale_0.90.optimized.yaml` の最終料率式で profit_test を再計算した。
+data/company_expense.csv（0.90スケール済み）の費用列（acq_var_total, acq_fixed_total, maint_var_total, maint_fixed_total, coll_var_total, overhead_total）を ±10% スケールし、`configs/trial-001.optimized.yaml` の最終料率式で profit_test を再計算した。
 
 |scenario|min_irr|min_nbv|min_loading_surplus_ratio|max_premium_to_maturity|
 |---|---|---|---|---|
@@ -212,9 +221,9 @@ out/company_expense_scale_0.90.csv の費用列（acq_var_total, acq_fixed_total
   - `beta  = b0 + b_age*(issue_age-30) + b_term*(term_years-10) + b_sex*(sex_indicator)`
   - `gamma = clamp(g0 + g_term*(term_years-10), 0, 0.5)`
 
-注記: feasibility sweep は `configs/trial-001.yaml` の `loading_alpha_beta_gamma` を固定値として使う。一方、最終の料率式で使う係数は `out/trial-001.expense_scale_0.90.optimized.yaml` の `loading_parameters` に基づく。
+注記: feasibility sweep は `configs/trial-001.yaml` の `loading_alpha_beta_gamma` を固定値として使う。一方、最終の料率式で使う係数は `configs/trial-001.optimized.yaml` の `loading_parameters` に基づく。
 
-最終の loading_parameters（out/trial-001.expense_scale_0.90.optimized.yaml）
+最終の loading_parameters（configs/trial-001.optimized.yaml）
 |係数|値|
 |---|---|
 |a0|0.005999999999999986|
