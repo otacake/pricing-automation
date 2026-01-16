@@ -83,6 +83,7 @@ class ProfitTestResult:  # 収益性検証の結果を保持する
     - loading_surplus: pv_loading - pv_expense (JPY)
     - premium_total: gross annual premium * premium years (JPY)
     - premium_to_maturity_ratio: premium_total / sum_assured
+    - profit_breakdown: present value breakdown for diagnostics (JPY)
     """
 
     model_point: ModelPoint  # モデルポイント条件
@@ -96,6 +97,7 @@ class ProfitTestResult:  # 収益性検証の結果を保持する
     loading_surplus: float  # loading現価 - 費用現価
     premium_total: float  # 総払込保険料
     premium_to_maturity_ratio: float  # 総払込/満期保険金
+    profit_breakdown: dict[str, float] | None = None  # 診断用の収支分解
 
 
 @dataclass(frozen=True)  # 複数モデルポイント結果を不変で扱うため
@@ -268,12 +270,13 @@ def _reserve_factors(  # 予定・評価の準備金係数を計算する
     premium_paying_years: int,  # 払込期間
     interest_rate: float,  # 利率
     alpha: float,  # loadingのalpha
+    surrender_charge_term: int = 10,  # 解約控除期間
 ) -> tuple[list[float], list[float], float]:  # tV, tW, net_rateを返す
     """
     Build tV and tW series for t=0..term_years.
 
     - tV = A(x+t:n-t) - net_rate * a(x+t:n-t)
-    - tW = max(tV - ((10 - min(t,10)) / 10) * alpha, 0)
+    - tW = max(tV - ((k - min(t,k)) / k) * alpha, 0) where k=surrender_charge_term
     """
     A0, a0 = _calc_endowment_values(  # 初期時点のAとaを計算する
         q_by_age=q_by_age,  # 年齢別死亡率
@@ -288,6 +291,8 @@ def _reserve_factors(  # 予定・評価の準備金係数を計算する
 
     tV: list[float] = []  # tV系列を初期化する
     tW: list[float] = []  # tW系列を初期化する
+    if surrender_charge_term <= 0:  # 解約控除期間が不正な場合
+        raise ValueError("surrender_charge_term must be positive.")  # 入力不備を通知する
     for t in range(term_years + 1):  # t=0..nまで計算する
         remaining_term = term_years - t  # 残存期間を求める
         remaining_premium = max(premium_paying_years - t, 0)  # 残存払込期間を求める
@@ -300,7 +305,9 @@ def _reserve_factors(  # 予定・評価の準備金係数を計算する
         )  # Aとaの計算
         reserve = A_t - net_rate * a_t  # 予定準備金係数を計算する
         tV.append(reserve)  # tVに追加する
-        surrender_adj = (10 - min(t, 10)) / 10.0  # 10年逓減の解約控除係数
+        surrender_adj = (  # 解約控除係数（逓減）
+            (surrender_charge_term - min(t, surrender_charge_term)) / float(surrender_charge_term)
+        )
         tW.append(max(reserve - surrender_adj * alpha, 0.0))  # 解約返戻金係数を計算する
 
     return tV, tW, net_rate  # tV, tW, 純保険料率を返す
@@ -521,6 +528,29 @@ def _build_summary(results: list[ProfitTestResult]) -> pd.DataFrame:  # モデ�
     return pd.DataFrame(rows)  # DataFrameに変換して返す
 
 
+def _build_profit_breakdown(cashflow: pd.DataFrame) -> dict[str, float]:  # 診断用の収支分解を作る
+    def _pv(col: str) -> float:  # 割引現在価値を計算する補助関数
+        return float((cashflow[col] * cashflow["spot_df"]).sum())
+
+    return {
+        "pv_premium_income": _pv("premium_income"),
+        "pv_net_premium_income": _pv("net_premium_income"),
+        "pv_loading_income": _pv("loading_income"),
+        "pv_benefit_death": _pv("death_benefit"),
+        "pv_benefit_surrender": _pv("surrender_benefit"),
+        "pv_benefit_maturity": _pv("maturity_benefit"),
+        "pv_expenses_acq": _pv("expenses_acq"),
+        "pv_expenses_maint": _pv("expenses_maint"),
+        "pv_expenses_coll": _pv("expenses_coll"),
+        "pv_expenses_total": _pv("expenses_total"),
+        "pv_reserve_change": _pv("reserve_change"),
+        "pv_investment_income": _pv("investment_income"),
+        "pv_net_cf": float(cashflow["pv_net_cf"].sum()),
+        "pv_loading": float(cashflow["pv_loading"].sum()),
+        "pv_expense": float(cashflow["pv_expense"].sum()),
+    }
+
+
 def run_profit_test(  # profit testを実行するメイン関数
     config: dict,  # 設定
     base_dir: Path | None = None,  # 相対パス基準
@@ -549,6 +579,9 @@ def run_profit_test(  # profit testを実行するメイン関数
         profit_test_cfg.get("valuation_interest_rate", DEFAULT_VALUATION_INTEREST)
     )  # 既定値で補完する
     lapse_rate = float(profit_test_cfg.get("lapse_rate", DEFAULT_LAPSE_RATE))  # 失効率を取得する
+    surrender_charge_term = int(  # 解約控除期間を取得する
+        profit_test_cfg.get("surrender_charge_term", 10)
+    )
 
     pricing_mortality_path = _resolve_path(base_dir, pricing["mortality_path"])  # 予定死亡率パスを解決する
     actual_mortality_path = _resolve_path(  # 実績死亡率パスを解決する
@@ -590,6 +623,7 @@ def run_profit_test(  # profit testを実行するメイン関数
             premium_paying_years=model_point.premium_paying_years,  # 払込期間
             interest_rate=pricing_interest,  # 予定利率
             alpha=loadings.alpha,  # alpha
+            surrender_charge_term=surrender_charge_term,  # 解約控除期間
         )  # 予定準備金係数
         tV_valuation, _, _ = _reserve_factors(  # 評価基準の準備金係数を計算する
             q_by_age=q_pricing,  # 予定死亡率
@@ -598,6 +632,7 @@ def run_profit_test(  # profit testを実行するメイン関数
             premium_paying_years=model_point.premium_paying_years,  # 払込期間
             interest_rate=valuation_interest,  # 評価利率
             alpha=loadings.alpha,  # alpha
+            surrender_charge_term=surrender_charge_term,  # 解約控除期間
         )  # 評価準備金係数
 
         inforce_begin, inforce_end, death_rates, lapse_rates = _inforce_series(  # 保有率と退出率を計算する
@@ -738,6 +773,7 @@ def run_profit_test(  # profit testを実行するメイン関数
         loading_surplus = pv_loading - pv_expense  # 充足額を計算する
         premium_total = float(premiums.gross_annual_premium * model_point.premium_paying_years)  # 総払込保険料
         premium_to_maturity_ratio = premium_total / float(model_point.sum_assured)  # PTM比率を計算する
+        profit_breakdown = _build_profit_breakdown(cashflow)  # 収支分解を計算する
 
         results.append(  # モデルポイント結果を追加する
             ProfitTestResult(  # 結果オブジェクトを構築する
@@ -752,6 +788,7 @@ def run_profit_test(  # profit testを実行するメイン関数
                 loading_surplus=loading_surplus,  # 充足額
                 premium_total=premium_total,  # 総払込
                 premium_to_maturity_ratio=premium_to_maturity_ratio,  # PTM比率
+                profit_breakdown=profit_breakdown,  # 収支分解
             )  # 結果オブジェクト
         )  # リストに追加
 

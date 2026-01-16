@@ -1,4 +1,6 @@
-﻿# pricing-automation
+﻿# Pricing Automation Agent (Strategic Edition)
+
+Don't just calculate. Negotiate.
 
 このリポジトリでできること（例）
 ```powershell
@@ -6,15 +8,18 @@ python -m pricing.cli report-feasibility configs\trial-001.yaml
 ```
 
 ## 1. これは何か
-養老保険（endowment）を対象に、YAML設定とCSV入力から保険料・キャッシュフロー・IRR/NBV・制約評価を再現可能に実行する学習用リポジトリです。`src/pricing/cli.py` を入口に run/optimize/sweep-ptm/report-feasibility を実行し、`out/` と `reports/` に結果を出力します。
+養老保険（endowment）を対象に、YAML設定とCSV入力から保険料・キャッシュフロー・IRR/NBV・制約評価を再現可能に実行する学習用リポジトリです。単なる計算機ではなく、厳しい規制とビジネス要求の狭間で「どの前提を崩せば商品化できるか」を提案する、アクチュアリーのための戦略的エージェントとして設計しています。`src/pricing/cli.py` を入口に run/optimize/sweep-ptm/report-feasibility を実行し、`out/` と `reports/` に結果を出力します。
 
-## 2. できること
-- `configs/trial-001.yaml` と `data/*.csv` から収益性検証（IRR/NBV/費用充足）を実行し、Excelとログを出力できる
-- alpha/beta/gamma 係数を最適化し、`configs/trial-001.optimized.yaml` を生成できる
+## 2. できること / Key Features
+- `configs/trial-001.yaml` と `data/*.csv` から収益性検証（IRR/NBV/費用充足）を実行し、Excel・ログ・構造化診断（`out/run_summary.json`）を出力できる
+- **Constraint Hacking**: alpha/beta/gamma 係数を最適化して `configs/trial-001.optimized.yaml` を生成し、解が見つからない場合は「制約ハック候補」（解約控除期間の延長や目標IRRの調整）を提案できる
 - premium_to_maturity を掃引し、実現可能領域を `out/feasibility_deck.yaml` に数値として残せる
 - `reports/feasibility_report.md` と `reports/pdca_log.md` で意思決定の記録を残せる
+- **Narrative Generation（将来構想）**: 数値を「経営会議を通すためのロジック」として要約し、承認資料化する
 
-## 3. 最短実行
+## 3. 最短実行（Story-driven）
+> 「IRRが目標に届かない？ 諦める前に `python -m pricing.cli optimize configs\trial-001.yaml` を叩け。失敗したらログに `WARNING: Default constraints unsatisfied...` と出る。そこから“どの前提を崩すか”を交渉に持ち込め。」
+
 手順1: Python 3.11 以上を用意し、仮想環境を作成して有効化します。
 ```powershell
 python -m venv .venv
@@ -99,6 +104,8 @@ optimization:
 |`pricing.mortality_path`|予定死亡率CSVパス|
 |`profit_test.discount_curve_path`|スポット金利CSVパス|
 |`profit_test.mortality_actual_path`|実績死亡率CSVパス|
+|`profit_test.surrender_charge_term`|解約控除期間（任意。未指定時は既定値）|
+|`outputs.run_summary_path`|構造化診断の出力パス（任意。未指定時は `out/run_summary.json`）|
 |`loading_alpha_beta_gamma`|alpha/beta/gamma を固定値で使う簡易入力|
 |`optimization.watch_model_point_ids`|watch対象のモデルポイントID|
 |`optimization.premium_to_maturity_hard_max`|premium_to_maturity の上限制約|
@@ -119,15 +126,21 @@ optimization:
 
 ## 6. コマンド別の説明
 ### run
-収益性検証を実行し、`out/result_trial-001.xlsx` と `out/result_trial-001.log` を出力します。
+収益性検証を実行し、`out/result_trial-001.xlsx` と `out/result_trial-001.log` を出力します。併せて `out/run_summary.json` に制約余裕度や診断指標を出力します。
 ```powershell
 python -m pricing.cli run configs\trial-001.yaml
 ```
 
 ### optimize
-loading係数を最適化し、`configs/trial-001.optimized.yaml` を生成します。
+loading係数を最適化し、`configs/trial-001.optimized.yaml` を生成します。解が見つからない場合はハック案（解約控除期間の延長・目標IRR調整）を試行し、成功時はログに WARNING を出力します。
 ```powershell
 python -m pricing.cli optimize configs\trial-001.yaml
+```
+
+### propose-change
+設定値を一時的に書き換えて影響を評価し、`out/propose_change.json` に差分と診断を出力します（設定は保存しません）。
+```powershell
+python -m pricing.cli propose-change configs\trial-001.yaml --set loading_parameters.a_age=0.002 --reason "若年層IRRの改善"
 ```
 
 ### sweep-ptm
@@ -158,6 +171,7 @@ flowchart LR
   CLI --> Optimize[src/pricing/optimize.py]
   CLI --> Sweep[src/pricing/sweep_ptm.py]
   CLI --> Report[src/pricing/report_feasibility.py]
+  CLI --> Diagnostics[src/pricing/diagnostics.py]
 
   Profit --> Endowment[src/pricing/endowment.py]
   Profit --> Commutation[src/pricing/commutation.py]
@@ -165,6 +179,8 @@ flowchart LR
 
   Outputs --> Xlsx[out/result_trial-001.xlsx]
   Outputs --> Log[out/result_trial-001.log]
+  Diagnostics --> RunSummary[out/run_summary.json]
+  CLI --> ProposeOut[out/propose_change.json]
 
   Report --> Deck[out/feasibility_deck.yaml]
   Deck --> ReportsDeck[reports/feasibility_deck.yaml]
@@ -172,17 +188,20 @@ flowchart LR
 ```
 
 ## 8. 最適化の全体像（optimize）
-`src/pricing/optimize.py` が反復評価し、hard 制約を満たしつつ min_irr を改善します。watch/exempt の扱いも含めた流れは以下です。
+`src/pricing/optimize.py` が反復評価し、hard 制約を満たしつつ min_irr を改善します。watch/exempt とハック提案の流れは以下です。
 ```mermaid
 flowchart LR
   Start[src/pricing/optimize.py] --> Eval[profit_test.run_profit_test]
   Eval --> Check[hard制約評価]
   Check -->|watch| Watch[watch: 制約/目的から除外]
   Check -->|exempt| Exempt[exempt: hard制約から除外]
+  Check -->|fail| Hack[Hack Proposal: surrender_charge_term 12/15 or irr_target -0.01]
+  Hack --> Eval
   Check --> Score[目的関数とmin_irr計算]
   Score --> Update[loading係数を更新]
   Update --> Eval
   Score --> Stop[改善なし or 回数上限で停止]
+  Hack --> Warning[WARNING in log]
 ```
 
 ## 9. 出力の読み方
@@ -191,7 +210,9 @@ flowchart LR
 |---|---|---|
 |`out/result_trial-001.xlsx`|収益性検証のExcel|キャッシュフローとモデルポイント要約|
 |`out/result_trial-001.log`|収益性検証ログ|IRR/NBV/費用充足の一覧|
+|`out/run_summary.json`|構造化診断|制約余裕度・違反・収支分解|
 |`configs/trial-001.optimized.yaml`|最適化済みYAML|`loading_parameters` と `optimize_summary`|
+|`out/propose_change.json`|変更案の影響評価|diff・影響指標・違反一覧|
 |`out/sweep_ptm_*.csv`|sweep結果|rごとの IRR/NBV/充足度|
 |`out/feasibility_deck.yaml`|実現可能領域の数値デッキ|数値の一次資料|
 |`reports/feasibility_deck.yaml`|追跡用数値デッキ|レビュー用スナップショット|
@@ -213,6 +234,7 @@ flowchart LR
 |別商品への拡張|`src/pricing/endowment.py`, `src/pricing/profit_test.py`|キャッシュフロー定義の追加が必要|
 |別の基礎率|`data/*.csv`, `configs/*.yaml`|CSV列とパスを差し替え|
 |別の最適化方針|`src/pricing/optimize.py`, `configs/*.yaml`|目的関数や制約を変更|
+|診断の拡張|`src/pricing/diagnostics.py`, `src/pricing/outputs.py`|診断項目・JSON構造の追加|
 |可視化の拡張|`reports/*.md`, `reports/*.yaml`|数値デッキを基に手書きで整理|
 
 Disclaimer 本リポジトリは、保険数理の学習およびPythonによる実装パターンの研究を目的として作成された個人の趣味プロジェクトです。 計算ロジックは一般的な教科書記述に基づいています。使用されているデータやパラメータはすべて架空のもの、または公開データに基づくものであり、実在する特定の商品・組織の数値とは一切関係ありません。

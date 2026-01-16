@@ -5,10 +5,12 @@ Output helpers for profit test results.
 """
 
 from pathlib import Path  # パスの操作をOS非依存で行うため
+import json  # JSON出力に使うため
 
 from openpyxl import Workbook  # Excelファイル出力に使うため
 
 from .config import load_optimization_settings, loading_surplus_threshold  # 最適化設定と閾値計算に使うため
+from .diagnostics import build_run_summary  # 診断サマリ出力に使うため
 from .optimize import OptimizationResult  # 最適化結果の型を参照するため
 from .profit_test import ProfitTestBatchResult, ProfitTestResult, model_point_label  # 収益性検証結果の型と表示用に使うため
 
@@ -119,6 +121,18 @@ def write_profit_test_log(  # 収益性検証のログをテキストで出力�
     return path  # 保存先を返す
 
 
+
+def write_run_summary_json(  # ????????????JSON?????
+    path: Path,  # ????
+    config: dict,  # ????
+    result: ProfitTestBatchResult,  # ????
+    source: str = "run",  # ?????????
+) -> Path:  # ???????
+    path.parent.mkdir(parents=True, exist_ok=True)  # ?????????????
+    summary = build_run_summary(config, result, source=source)  # ??????????
+    path.write_text(json.dumps(summary, indent=2, ensure_ascii=True), encoding="utf-8")  # JSON??
+    return path  # ???????
+
 def write_optimize_log(  # 最適化結果をテキストで出力する
     path: Path,  # ログ出力先
     config: dict,  # 実行設定
@@ -159,6 +173,27 @@ def write_optimize_log(  # 最適化結果をテキストで出力する
         f"g0: {result.params.g0}",  # gamma基礎
         f"g_term: {result.params.g_term}",  # gamma期間
     ]  # ログヘッダーここまで
+
+    if result.proposal:  # 条件付き成功の提案がある場合
+        changes = result.proposal.get("changes", [])
+        change_labels = []
+        for change in changes:
+            path = change.get("path", "unknown")
+            value = change.get("value", "n/a")
+            if path == "profit_test.surrender_charge_term":
+                change_labels.append(f"Extend surrender_charge_term to {value} years")
+            elif path == "optimization.irr_target":
+                change_labels.append(f"Lower irr_target to {value}")
+            else:
+                change_labels.append(f"{path}={value}")
+        change_desc = ", ".join(change_labels) if change_labels else "See proposal details"
+        lines.append(
+            f"WARNING: Default constraints unsatisfied. Proposed Hack: {change_desc}."
+        )
+        lines.append(f"proposal_plan: {result.proposal.get('plan', 'n/a')}")
+        lines.append(
+            f"proposal_justification: {result.proposal.get('justification', 'n/a')}"
+        )
 
     if result.watch_model_points is not None:  # 監視対象の指定がある場合
         watch_ids = result.watch_model_points  # 監視対象の一覧

@@ -5,13 +5,21 @@ CLI entrypoint for pricing automation.
 """
 
 import argparse  # CLI引数を扱うため
+import copy  # 設定の深いコピーに使うため
+import json  # JSON出力に使うため
 from pathlib import Path  # パスをOSに依存せず扱うため
 
 import yaml  # YAML設定を読み込むため
 
 from .config import load_optimization_settings, loading_surplus_threshold, read_loading_parameters  # 設定値の解釈に使うため
+from .diagnostics import build_run_summary  # 構造化診断に使うため
 from .optimize import optimize_loading_parameters, write_optimized_config  # 最適化の実行と結果保存に使うため
-from .outputs import write_optimize_log, write_profit_test_excel, write_profit_test_log  # 出力ファイル生成に使うため
+from .outputs import (  # 出力ファイル生成に使うため
+    write_optimize_log,
+    write_profit_test_excel,
+    write_profit_test_log,
+    write_run_summary_json,
+)
 from .profit_test import run_profit_test  # 収益性検証の本体を呼び出すため
 from .report_feasibility import report_feasibility_from_config  # Feasibility report generation
 from .sweep_ptm import sweep_premium_to_maturity, sweep_premium_to_maturity_all  # premium-to-maturityのスイープ処理を呼ぶため
@@ -19,6 +27,30 @@ from .sweep_ptm import sweep_premium_to_maturity, sweep_premium_to_maturity_all 
 
 def _load_config(path: Path) -> dict:  # YAMLを読み込んで辞書に変換する補助関数
     return yaml.safe_load(path.read_text(encoding="utf-8"))  # ファイルをUTF-8で読み、YAMLを安全にパースする
+
+
+def _parse_set_arguments(raw_values: list[str]) -> list[tuple[str, object]]:  # --set 引数を解析する
+    updates: list[tuple[str, object]] = []
+    for raw in raw_values:
+        if "=" not in raw:
+            raise SystemExit(f"Invalid --set value (expected key=value): {raw}")
+        key, value_text = raw.split("=", 1)
+        updates.append((key.strip(), yaml.safe_load(value_text)))
+    return updates
+
+
+def _apply_config_update(config: dict, dotted_key: str, value: object) -> object:  # 設定の一部を更新する
+    keys = [part for part in dotted_key.split(".") if part]
+    if not keys:
+        raise SystemExit("Invalid key path for --set.")
+    cursor = config
+    for key in keys[:-1]:
+        if key not in cursor or not isinstance(cursor[key], dict):
+            cursor[key] = {}
+        cursor = cursor[key]
+    previous = cursor.get(keys[-1])
+    cursor[keys[-1]] = value
+    return previous
 
 
 def _format_run_output(config: dict, result) -> str:  # run結果を人が読みやすいテキストに整形する
@@ -141,6 +173,8 @@ def run_from_config(config_path: Path) -> int:  # YAML設定を使ってprofit t
 
     write_profit_test_excel(excel_path, result)  # Excel結果を書き出す
     write_profit_test_log(log_path, config, result)  # ログ結果を書き出す
+    summary_path = base_dir / outputs_cfg.get("run_summary_path", "out/run_summary.json")
+    write_run_summary_json(summary_path, config, result, source="run")
     print(_format_run_output(config, result))  # 標準出力にも結果サマリを表示する
     return 0  # 正常終了コードを返す
 
@@ -166,6 +200,74 @@ def optimize_from_config(config_path: Path) -> int:  # YAML設定を使って最
 
     print(log_path.read_text(encoding="utf-8"))  # ログ内容を標準出力に表示する
     return 0  # 正常終了コードを返す
+
+
+def propose_change_from_config(  # 変更案を評価する
+    config_path: Path,  # 設定ファイルのパス
+    updates: list[tuple[str, object]],  # 変更内容
+    reason: str,  # 変更理由
+    out_path: Path | None,  # 出力パス（任意）
+) -> int:
+    config = _load_config(config_path)  # 設定ファイルを読み込む
+    base_dir = Path.cwd()  # 相対パス解決の基準ディレクトリを取得する
+    baseline_result = run_profit_test(config, base_dir=base_dir)  # 変更前の結果を計算する
+    baseline_summary = build_run_summary(config, baseline_result, source="propose_change_baseline")
+
+    updated_config = copy.deepcopy(config)  # 変更用に深いコピーを作る
+    changes: list[dict[str, object]] = []
+    for key, value in updates:
+        previous = _apply_config_update(updated_config, key, value)
+        changes.append({"path": key, "before": previous, "after": value})
+
+    proposal_result = run_profit_test(updated_config, base_dir=base_dir)  # 変更後の結果を計算する
+    proposal_summary = build_run_summary(updated_config, proposal_result, source="propose_change_candidate")
+
+    def _metrics(summary: dict) -> dict[str, float]:
+        data = summary["summary"]
+        return {
+            "min_irr": float(data["min_irr"]),
+            "min_nbv": float(data["min_nbv"]),
+            "min_loading_surplus_ratio": float(data["min_loading_surplus_ratio"]),
+            "max_premium_to_maturity": float(data["max_premium_to_maturity"]),
+            "violation_count": float(data["violation_count"]),
+        }
+
+    base_metrics = _metrics(baseline_summary)
+    proposal_metrics = _metrics(proposal_summary)
+    delta = {key: proposal_metrics[key] - base_metrics[key] for key in base_metrics}
+
+    base_status = {mp["model_point"]: mp["status"] for mp in baseline_summary["model_points"]}
+    proposal_status = {mp["model_point"]: mp["status"] for mp in proposal_summary["model_points"]}
+    affected = sorted(
+        mp for mp in proposal_status if proposal_status.get(mp) != base_status.get(mp)
+    )
+
+    output = {
+        "meta": {"reason": reason, "config_path": str(config_path)},
+        "changes": changes,
+        "baseline": baseline_summary,
+        "proposal": proposal_summary,
+        "delta": delta,
+        "affected_model_points": affected,
+    }
+
+    output_path = out_path or (base_dir / "out/propose_change.json")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(output, indent=2, ensure_ascii=True), encoding="utf-8")
+
+    print("propose_change")
+    print(f"reason: {reason}")
+    for change in changes:
+        print(f"change: {change['path']} {change['before']} -> {change['after']}")
+    print(f"baseline: {base_metrics}")
+    print(f"proposal: {proposal_metrics}")
+    print(f"delta: {delta}")
+    if affected:
+        print("affected_model_points:")
+        for mp in affected:
+            print(f"- {mp} {base_status.get(mp)} -> {proposal_status.get(mp)}")
+    print(f"wrote: {output_path}")
+    return 0
 
 
 def sweep_ptm_from_config(  # premium-to-maturityスイープをYAML設定から実行する
@@ -281,6 +383,20 @@ def main(argv: list[str] | None = None) -> int:  # CLIのメイン処理を実�
     report_parser.add_argument("--r-step", type=float, default=0.01)
     report_parser.add_argument("--irr-threshold", type=float, default=0.04)
     report_parser.add_argument("--out", type=str, default="out/feasibility_deck.yaml")
+
+    propose_parser = subparsers.add_parser(
+        "propose-change", help="Evaluate a parameter change without persisting it."
+    )
+    propose_parser.add_argument("config", type=str, help="Path to config YAML.")
+    propose_parser.add_argument(
+        "--set",
+        dest="set_values",
+        action="append",
+        default=[],
+        help="Set a config value (e.g., loading_parameters.a_age=0.002).",
+    )
+    propose_parser.add_argument("--reason", type=str, required=True)
+    propose_parser.add_argument("--out", type=str, default="out/propose_change.json")
     args = parser.parse_args(argv)  # CLI引数を解析する
     if args.command == "run":  # runコマンドの場合
         return run_from_config(Path(args.config))  # run処理を実行する
@@ -312,6 +428,16 @@ def main(argv: list[str] | None = None) -> int:  # CLIのメイン処理を実�
         )
         print(f"wrote: {output_path}")
         return 0
+    if args.command == "propose-change":
+        if not args.set_values:
+            raise SystemExit("propose-change requires at least one --set value.")
+        updates = _parse_set_arguments(args.set_values)
+        return propose_change_from_config(
+            Path(args.config),
+            updates=updates,
+            reason=str(args.reason),
+            out_path=Path(args.out) if args.out else None,
+        )
     return 1  # 未知のコマンドは異常終了として扱う
 
 
