@@ -25,6 +25,9 @@ YAML設定 + CSVデータを入力にして、以下を行います。
 - `python -m pricing.cli report-executive-pptx ...`
   - `reports/feasibility_report.md` と `reports/executive_pricing_deck.pptx` を生成
   - 既定は日本語出力（`--lang en` で英語に切替可）
+  - グラフ文字は既定で英語（`--chart-lang en`）
+- `python -m pricing.cli run-cycle ...`
+  - ポリシーに基づくPDCA一括実行（test→run→optimize→report）
 
 ---
 
@@ -71,6 +74,12 @@ python -m pricing.cli report-executive-pptx configs\trial-001.executive.optimize
 - `out/run_summary_executive.json`
 - `out/feasibility_deck_executive.yaml`
 - `out/charts/executive/*.png`
+
+またはPDCAを一括実行:
+
+```powershell
+python -m pricing.cli run-cycle configs\trial-001.yaml --policy policy/pricing_policy.yaml
+```
 
 ---
 
@@ -182,7 +191,14 @@ python -m pricing.cli report-executive-pptx <config.yaml> `
   --run-summary-out out/run_summary_executive.json `
   --deck-out out/feasibility_deck_executive.yaml `
   --chart-dir out/charts/executive `
-  --lang ja
+  --lang ja `
+  --chart-lang en
+```
+
+### `run-cycle`
+
+```powershell
+python -m pricing.cli run-cycle <config.yaml> --policy policy/pricing_policy.yaml
 ```
 
 ---

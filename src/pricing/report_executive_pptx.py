@@ -825,8 +825,10 @@ def report_executive_pptx_from_config(
     irr_threshold: float = 0.02,
     include_sensitivity: bool = True,
     language: str = "ja",
+    chart_language: str = "en",
 ) -> ExecutiveReportOutputs:
     language = _validate_language(language)
+    chart_language = _validate_language(chart_language)
     config_path = config_path.expanduser().resolve()
     config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
     base_dir = resolve_base_dir_from_config(config_path)
@@ -879,12 +881,12 @@ def report_executive_pptx_from_config(
     cashflow_chart = _plot_cashflow_by_profit_source(
         agg_cashflow,
         chart_output_dir / "cashflow_by_profit_source.png",
-        language=language,
+        language=chart_language,
     )
     premium_chart = _plot_annual_premium_by_model_point(
         result.summary,
         chart_output_dir / "annual_premium_by_model_point.png",
-        language=language,
+        language=chart_language,
     )
 
     sensitivity_rows = (

@@ -31,6 +31,7 @@ def test_report_executive_pptx_generates_outputs(tmp_path: Path) -> None:
         irr_threshold=0.0,
         include_sensitivity=False,
         language="ja",
+        chart_language="en",
     )
 
     assert outputs.pptx_path.exists()

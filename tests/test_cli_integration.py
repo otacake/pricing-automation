@@ -82,6 +82,8 @@ def test_cli_report_executive_pptx_writes_outputs(tmp_path: Path) -> None:
             "0.0",
             "--lang",
             "ja",
+            "--chart-lang",
+            "en",
         ]
     )
 

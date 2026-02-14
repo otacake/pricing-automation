@@ -24,6 +24,7 @@ from .paths import resolve_base_dir_from_config  # 相対パス解決の基準�
 from .profit_test import run_profit_test  # 収益性検証の本体を呼び出すため
 from .report_executive_pptx import report_executive_pptx_from_config  # 経営向けPPTXとMarkdownを生成するため
 from .report_feasibility import report_feasibility_from_config  # Feasibility report generation
+from .pdca_cycle import run_pdca_cycle
 from .sweep_ptm import sweep_premium_to_maturity, sweep_premium_to_maturity_all  # premium-to-maturityのスイープ処理を呼ぶため
 
 
@@ -452,6 +453,30 @@ def main(argv: list[str] | None = None) -> int:  # CLIのメイン処理を実�
         default="ja",
         help="Language for Markdown/PPTX deliverables.",
     )
+    executive_parser.add_argument(
+        "--chart-lang",
+        type=str,
+        choices=("ja", "en"),
+        default="en",
+        help="Language for chart text. Default is English to avoid font issues.",
+    )
+
+    cycle_parser = subparsers.add_parser(
+        "run-cycle",
+        help="Run autonomous PDCA pricing cycle with policy.",
+    )
+    cycle_parser.add_argument("config", type=str, help="Path to config YAML.")
+    cycle_parser.add_argument(
+        "--policy",
+        type=str,
+        default="policy/pricing_policy.yaml",
+        help="Path to auto cycle policy YAML.",
+    )
+    cycle_parser.add_argument(
+        "--skip-tests",
+        action="store_true",
+        help="Skip pytest pre-check in cycle.",
+    )
 
     propose_parser = subparsers.add_parser(
         "propose-change", help="Evaluate a parameter change without persisting it."
@@ -510,6 +535,7 @@ def main(argv: list[str] | None = None) -> int:  # CLIのメイン処理を実�
             r_step=float(args.r_step),
             irr_threshold=float(args.irr_threshold),
             language=str(args.lang),
+            chart_language=str(args.chart_lang),
         )
         print(f"wrote_pptx: {outputs.pptx_path}")
         print(f"wrote_markdown: {outputs.markdown_path}")
@@ -517,6 +543,27 @@ def main(argv: list[str] | None = None) -> int:  # CLIのメイン処理を実�
         print(f"wrote_feasibility_deck: {outputs.feasibility_deck_path}")
         print(f"wrote_cashflow_chart: {outputs.cashflow_chart_path}")
         print(f"wrote_premium_chart: {outputs.premium_chart_path}")
+        return 0
+    if args.command == "run-cycle":
+        outputs = run_pdca_cycle(
+            Path(args.config),
+            policy_path=Path(args.policy),
+            skip_tests=bool(args.skip_tests),
+        )
+        print(f"run_id: {outputs.run_id}")
+        print(f"wrote_manifest: {outputs.manifest_path}")
+        print(f"wrote_baseline_summary: {outputs.baseline_summary_path}")
+        print(f"wrote_final_summary: {outputs.final_summary_path}")
+        print(f"wrote_result_log: {outputs.result_log_path}")
+        print(f"wrote_result_excel: {outputs.result_excel_path}")
+        if outputs.optimized_config_path is not None:
+            print(f"wrote_optimized_config: {outputs.optimized_config_path}")
+        if outputs.feasibility_deck_path is not None:
+            print(f"wrote_feasibility_deck: {outputs.feasibility_deck_path}")
+        if outputs.markdown_report_path is not None:
+            print(f"wrote_markdown: {outputs.markdown_report_path}")
+        if outputs.executive_pptx_path is not None:
+            print(f"wrote_pptx: {outputs.executive_pptx_path}")
         return 0
     if args.command == "propose-change":
         if not args.set_values:

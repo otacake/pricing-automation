@@ -1,4 +1,4 @@
-# AGENTS vNext (Operating Constitution)
+# AGENTS vNext (Operating Blueprint)
 
 ## 0. Mission
 Set prices that satisfy adequacy, profitability, and soundness at the same time, and deliver a reproducible and auditable decision package for management.
@@ -9,6 +9,11 @@ Set prices that satisfy adequacy, profitability, and soundness at the same time,
 - Explainability: final pricing can be traced by formulas, coefficients, and intermediate calculations.
 - Reproducibility: same inputs and same commands can reproduce the same decision.
 - Decision readiness: management-grade Markdown and PPTX are generated.
+
+## 1.5 Operating Model
+- Human-readable rules: `AGENTS.md`
+- Machine-readable policy: `policy/pricing_policy.yaml`
+- Autonomous executor: `python -m pricing.cli run-cycle <config> --policy <policy>`
 
 ## 2. Language Boundary (Strict)
 - Japanese allowed:
@@ -43,6 +48,10 @@ Set prices that satisfy adequacy, profitability, and soundness at the same time,
 5. Execute sensitivity scenarios (interest/lapse/expense shocks).
 6. Generate management package (`.md` + `.pptx`).
 7. Append accepted/rejected options and residual risks to `reports/pdca_log.md`.
+
+## 5.5 Preferred Command
+- Recommended one-shot execution:
+  - `python -m pricing.cli run-cycle configs/trial-001.yaml --policy policy/pricing_policy.yaml`
 
 ## 6. Artifact Contract (Required Outputs Per Cycle)
 - `out/run_summary_<timestamp>.json`

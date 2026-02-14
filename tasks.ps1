@@ -1,8 +1,9 @@
 param(
     [Parameter(Mandatory = $true, Position = 0)]
-    [ValidateSet("test", "baseline", "optimize", "run", "sweep", "feasibility", "executive")]
+    [ValidateSet("test", "baseline", "optimize", "run", "sweep", "feasibility", "executive", "cycle")]
     [string]$Task,
     [string]$Config = "configs/trial-001.yaml",
+    [string]$Policy = "policy/pricing_policy.yaml",
     [string]$ModelPoint = "male_age30_term35",
     [double]$Start = 1.0,
     [double]$End = 1.05,
@@ -37,7 +38,11 @@ switch ($Task) {
         break
     }
     "executive" {
-        python -m pricing.cli report-executive-pptx $Config --r-start $Start --r-end $End --r-step $Step --irr-threshold $IrrThreshold
+        python -m pricing.cli report-executive-pptx $Config --r-start $Start --r-end $End --r-step $Step --irr-threshold $IrrThreshold --lang ja --chart-lang en
+        break
+    }
+    "cycle" {
+        python -m pricing.cli run-cycle $Config --policy $Policy
         break
     }
 }

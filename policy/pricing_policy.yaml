@@ -1,0 +1,15 @@
+gate:
+  max_violation_count: 0
+
+feasibility:
+  enabled: true
+  r_start: 1.0
+  r_end: 1.08
+  r_step: 0.005
+  irr_threshold: 0.02
+
+reporting:
+  generate_markdown: true
+  generate_executive_pptx: true
+  report_language: ja
+  chart_language: en
