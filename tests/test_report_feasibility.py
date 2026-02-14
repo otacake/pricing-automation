@@ -60,3 +60,23 @@ def test_report_feasibility_sweep_row_count() -> None:
 
     sweep_rows = deck["tables"]["sweep"]
     assert len(sweep_rows) == 6
+
+
+def test_report_feasibility_supports_loading_parameters_only() -> None:
+    config_path = REPO_ROOT / "configs" / "trial-001.optimized.yaml"
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    config.pop("loading_alpha_beta_gamma", None)
+    config["model_points"] = config["model_points"][:2]
+
+    deck = build_feasibility_report(
+        config=config,
+        base_dir=REPO_ROOT,
+        r_start=1.0,
+        r_end=1.0,
+        r_step=0.01,
+        irr_threshold=0.0,
+        config_path=config_path,
+    )
+
+    assert deck["meta"]["assumptions"]["loading"]["mode"] == "loading_parameters"
+    assert len(deck["tables"]["sweep"]) == 2

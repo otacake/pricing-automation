@@ -1,0 +1,101 @@
+run:
+  run_id: trial-001
+  as_of: '2026-01-11'
+product:
+  type: endowment
+  premium_mode: annual
+model_points:
+- id: male_age30_term35
+  sex: male
+  issue_age: 30
+  term_years: 35
+  premium_paying_years: 35
+  sum_assured: 3000000
+- id: male_age40_term25
+  sex: male
+  issue_age: 40
+  term_years: 25
+  premium_paying_years: 25
+  sum_assured: 3000000
+- id: male_age50_term20
+  sex: male
+  issue_age: 50
+  term_years: 20
+  premium_paying_years: 20
+  sum_assured: 3000000
+- id: female_age30_term35
+  sex: female
+  issue_age: 30
+  term_years: 35
+  premium_paying_years: 35
+  sum_assured: 3000000
+- id: female_age40_term25
+  sex: female
+  issue_age: 40
+  term_years: 25
+  premium_paying_years: 25
+  sum_assured: 3000000
+- id: female_age50_term20
+  sex: female
+  issue_age: 50
+  term_years: 20
+  premium_paying_years: 20
+  sum_assured: 3000000
+- id: female_age60_term10
+  sex: female
+  issue_age: 60
+  term_years: 10
+  premium_paying_years: 10
+  sum_assured: 3000000
+pricing:
+  interest:
+    type: flat
+    flat_rate: 0.01
+  mortality_path: data/mortality_pricing.csv
+  lapse:
+    annual_rate: 0.0
+loading_alpha_beta_gamma:
+  alpha: 0.03
+  beta: 0.007
+  gamma: 0.03
+profit_test:
+  discount_curve_path: data/spot_curve_actual.csv
+  mortality_actual_path: data/mortality_actual.csv
+  expense_model:
+    company_data_path: data/company_expense.csv
+    allocation_rule:
+      acquisition_fixed_basis: new_policies
+      maintenance_fixed_basis: inforce_avg
+      collection_fixed_basis: premium_income
+    include_overhead_as:
+      acquisition: 0.5
+      maintenance: 0.5
+outputs:
+  excel_path: out/result_trial-001.xlsx
+  log_path: out/result_trial-001.log
+optimization:
+  exemption:
+    enabled: false
+  watch_model_point_ids: []
+  premium_to_maturity_hard_max: 1.056
+  premium_to_maturity_soft_min: 1.02
+  bounds:
+    a_age:
+      step: 0.0002
+    a_term:
+      step: 0.0002
+    a_sex:
+      step: 0.0005
+    b_age:
+      step: 0.0001
+    b_term:
+      step: 0.0001
+    b_sex:
+      step: 0.0005
+    g_term:
+      step: 0.001
+  loading_surplus_hard_ratio: -0.1
+  nbv_hard: 0.0
+  irr_hard: 0.02
+  objective:
+    mode: maximize_min_irr

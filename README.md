@@ -8,7 +8,7 @@ python -m pricing.cli report-feasibility configs\trial-001.yaml
 ```
 
 ## 1. これは何か
-養老保険（endowment）を対象に、YAML設定とCSV入力から保険料・キャッシュフロー・IRR/NBV・制約評価を再現可能に実行する学習用リポジトリです。単なる計算機ではなく、厳しい規制とビジネス要求の狭間で「どの前提を崩せば商品化できるか」を提案する、アクチュアリーのための戦略的エージェントとして設計しています。`src/pricing/cli.py` を入口に run/optimize/sweep-ptm/report-feasibility を実行し、`out/` と `reports/` に結果を出力します。
+養老保険（endowment）を対象に、YAML設定とCSV入力から保険料・キャッシュフロー・IRR/NBV・制約評価を再現可能に実行する学習用リポジトリです。単なる計算機ではなく、厳しい規制とビジネス要求の狭間で「どの前提を崩せば商品化できるか」を提案する、アクチュアリーのための戦略的エージェントとして設計しています。`src/pricing/cli.py` を入口に run/optimize/sweep-ptm/report-feasibility/report-executive-pptx を実行し、`out/` と `reports/` に結果を出力します。
 
 ## 2. できること / Key Features
 - `configs/trial-001.yaml` と `data/*.csv` から収益性検証（IRR/NBV/費用充足）を実行し、Excel・ログ・構造化診断（`out/run_summary.json`）を出力できる
@@ -155,6 +155,17 @@ python -m pricing.cli sweep-ptm configs\trial-001.yaml --all-model-points --star
 ```powershell
 python -m pricing.cli report-feasibility configs\trial-001.yaml --out out\feasibility_deck.yaml
 Copy-Item out\feasibility_deck.yaml reports\feasibility_deck.yaml -Force
+```
+
+### report-executive-pptx
+経営層向けPPTXと実務向けMarkdownを同時に生成します。併せて再現性証跡（run summary / feasibility deck / chart画像）を出力します。
+```powershell
+python -m pricing.cli report-executive-pptx configs\trial-001.executive.optimized.yaml `
+  --out reports\executive_pricing_deck.pptx `
+  --md-out reports\feasibility_report.md `
+  --run-summary-out out\run_summary_executive.json `
+  --deck-out out\feasibility_deck_executive.yaml `
+  --chart-dir out\charts\executive
 ```
 
 ## 7. 計算の全体像（データフロー）

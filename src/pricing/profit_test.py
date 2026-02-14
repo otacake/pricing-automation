@@ -10,7 +10,7 @@ Cashflow columns are aligned with the Excel sheet "収益性検証":
 - irr corresponds to Excel B1 (IRR of net_cf series)
 """
 
-from dataclasses import dataclass  # 計算結果の構造を明確にするため
+from dataclasses import dataclass, replace  # 計算結果の構造を明確にするため
 from pathlib import Path  # ファイルパスをOS非依存で扱うため
 from typing import Iterable, Mapping  # 型注釈で入出力を明確にするため
 import pandas as pd  # テーブル計算に使うため
@@ -555,6 +555,7 @@ def run_profit_test(  # profit testを実行するメイン関数
     config: dict,  # 設定
     base_dir: Path | None = None,  # 相対パス基準
     loading_params: LoadingFunctionParams | None = None,  # 任意の係数上書き
+    gross_annual_premium_overrides: Mapping[str, int | float] | None = None,  # モデルポイント別の総保険料上書き
 ) -> ProfitTestBatchResult:  # バッチ結果を返す
     """
     Run profit test using the YAML config structure.
@@ -562,6 +563,7 @@ def run_profit_test(  # profit testを実行するメイン関数
     Units
     - base_dir: root for relative file paths
     - loading_params: overrides loading function coefficients (not a premium scaling factor)
+    - gross_annual_premium_overrides: model_point_label -> gross annual premium (JPY)
     """
     base_dir = base_dir or Path.cwd()  # 基準ディレクトリを決定する
 
@@ -597,6 +599,7 @@ def run_profit_test(  # profit testを実行するメイン関数
     results: list[ProfitTestResult] = []  # 結果のリストを初期化する
 
     for model_point in model_points:  # 各モデルポイントを計算する
+        model_point_id = model_point_label(model_point)  # モデルポイントIDを統一形式で取得する
         loadings = _resolve_loading_parameters(config, model_point, loading_params)  # alpha/beta/gammaを確定する
         forward_rates = _forward_rates_from_spot(spot_curve, model_point.term_years)  # フォワードレートを作る
 
@@ -612,6 +615,22 @@ def run_profit_test(  # profit testを実行するメイン関数
             beta=loadings.beta,  # beta
             gamma=loadings.gamma,  # gamma
         )  # 保険料計算結果
+        if (
+            gross_annual_premium_overrides is not None
+            and model_point_id in gross_annual_premium_overrides
+        ):
+            override_raw = gross_annual_premium_overrides[model_point_id]
+            override = int(round(float(override_raw), 0))
+            if override <= 0:
+                raise ValueError(
+                    f"gross_annual_premium override must be positive: {model_point_id}"
+                )
+            premiums = replace(
+                premiums,
+                gross_rate=float(override) / float(model_point.sum_assured),
+                gross_annual_premium=override,
+                monthly_premium=int(round(override / 12.0, 0)),
+            )
 
         q_pricing = build_mortality_q_by_age(pricing_rows, model_point.sex)  # 予定死亡率の辞書を作る
         q_actual = build_mortality_q_by_age(actual_rows, model_point.sex)  # 実績死亡率の辞書を作る
@@ -664,17 +683,13 @@ def run_profit_test(  # profit testを実行するメイン関数
             )  # 払込期間のみ計上する
             loading_income = premium_income - net_premium_income  # loading部分の収入を計算する
 
-            death_benefit = (  # 死亡給付
-                inforce_beg * q_t * model_point.sum_assured if is_premium_year else 0.0
-            )  # 払込期間のみ計上する
+            death_benefit = inforce_beg * q_t * model_point.sum_assured  # 死亡給付は保険期間を通じて計上する
             surrender_benefit = (  # 解約返戻金
                 inforce_beg
                 * w_t
                 * (tW_pricing[t] + tW_pricing[t + 1])
                 / 2.0
                 * model_point.sum_assured
-                if is_premium_year
-                else 0.0
             )  # 解約返戻金を計算する
             maturity_benefit = (  # 満期給付
                 inforce_end_t * model_point.sum_assured
@@ -693,9 +708,7 @@ def run_profit_test(  # profit testを実行するメイン関数
                 expenses_coll = expense_assumptions.coll_rate * premium_income  # 集金費は保険料比例で計上する
             else:  # loadingモードの場合
                 expenses_acq = (0.5 * loadings.alpha * model_point.sum_assured) if t == 0 else 0.0  # 獲得費を計上する
-                expenses_maint = (  # 維持費を計上する
-                    inforce_beg * model_point.sum_assured * loadings.beta if is_premium_year else 0.0
-                )  # 払込期間のみ計上する
+                expenses_maint = inforce_beg * model_point.sum_assured * loadings.beta  # 維持費は保険期間を通じて計上する
                 expenses_coll = (  # 集金費を計上する
                     inforce_beg * premiums.gross_annual_premium * loadings.gamma
                     if is_premium_year
@@ -705,12 +718,9 @@ def run_profit_test(  # profit testを実行するメイン関数
 
             reserve_begin = tV_valuation[t] * model_point.sum_assured  # 期首準備金
             reserve_end = tV_valuation[t + 1] * model_point.sum_assured  # 期末準備金
-            reserve_change = (  # 準備金増減
-                model_point.sum_assured
-                * (inforce_end_t * tV_valuation[t + 1] - inforce_beg * tV_valuation[t])
-                if is_premium_year
-                else 0.0
-            )  # 払込期間のみ計上する
+            reserve_change = model_point.sum_assured * (
+                inforce_end_t * tV_valuation[t + 1] - inforce_beg * tV_valuation[t]
+            )  # 準備金増減は保険期間を通じて計上する
 
             investment_income = (  # 運用収益
                 (
@@ -720,9 +730,7 @@ def run_profit_test(  # profit testを実行するメイン関数
                 )
                 * forward_rate
                 - (death_benefit + surrender_benefit) * ((1.0 + forward_rate) ** 0.5 - 1.0)
-                if is_premium_year
-                else 0.0
-            )  # 払込期間のみ計上する
+            )  # 運用収益は保険期間を通じて計上する
 
             net_cf = (  # 純キャッシュフロー
                 premium_income

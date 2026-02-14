@@ -12,7 +12,7 @@ from pathlib import Path  # パスをOSに依存せず扱うため
 import yaml  # YAML設定を読み込むため
 
 from .config import load_optimization_settings, loading_surplus_threshold, read_loading_parameters  # 設定値の解釈に使うため
-from .diagnostics import build_run_summary  # 構造化診断に使うため
+from .diagnostics import build_execution_context, build_run_summary  # 構造化診断に使うため
 from .optimize import optimize_loading_parameters, write_optimized_config  # 最適化の実行と結果保存に使うため
 from .outputs import (  # 出力ファイル生成に使うため
     write_optimize_log,
@@ -20,7 +20,9 @@ from .outputs import (  # 出力ファイル生成に使うため
     write_profit_test_log,
     write_run_summary_json,
 )
+from .paths import resolve_base_dir_from_config  # 相対パス解決の基準を決めるため
 from .profit_test import run_profit_test  # 収益性検証の本体を呼び出すため
+from .report_executive_pptx import report_executive_pptx_from_config  # 経営向けPPTXとMarkdownを生成するため
 from .report_feasibility import report_feasibility_from_config  # Feasibility report generation
 from .sweep_ptm import sweep_premium_to_maturity, sweep_premium_to_maturity_all  # premium-to-maturityのスイープ処理を呼ぶため
 
@@ -51,6 +53,11 @@ def _apply_config_update(config: dict, dotted_key: str, value: object) -> object
     previous = cursor.get(keys[-1])
     cursor[keys[-1]] = value
     return previous
+
+
+def _resolve_output_path(base_dir: Path, raw_path: str | Path | None, default: str) -> Path:
+    path = Path(default) if raw_path is None else Path(raw_path)
+    return path if path.is_absolute() else (base_dir / path)
 
 
 def _format_run_output(config: dict, result) -> str:  # run結果を人が読みやすいテキストに整形する
@@ -163,18 +170,32 @@ def run_from_config(config_path: Path) -> int:  # YAML設定を使ってprofit t
     """
     Run profit test from a YAML config file and write outputs.
     """
+    config_path = config_path.expanduser().resolve()
     config = _load_config(config_path)  # 設定ファイルを読み込む
-    base_dir = Path.cwd()  # 相対パス解決の基準ディレクトリを取得する
+    base_dir = resolve_base_dir_from_config(config_path)  # 相対パス解決の基準ディレクトリを取得する
     result = run_profit_test(config, base_dir=base_dir)  # 収益性検証を実行する
 
     outputs_cfg = config.get("outputs", {})  # 出力設定を取得する
-    excel_path = base_dir / outputs_cfg.get("excel_path", "out/result.xlsx")  # Excel出力先を決める
-    log_path = base_dir / outputs_cfg.get("log_path", "out/result.log")  # ログ出力先を決める
+    excel_path = _resolve_output_path(base_dir, outputs_cfg.get("excel_path"), "out/result.xlsx")
+    log_path = _resolve_output_path(base_dir, outputs_cfg.get("log_path"), "out/result.log")
 
     write_profit_test_excel(excel_path, result)  # Excel結果を書き出す
     write_profit_test_log(log_path, config, result)  # ログ結果を書き出す
-    summary_path = base_dir / outputs_cfg.get("run_summary_path", "out/run_summary.json")
-    write_run_summary_json(summary_path, config, result, source="run")
+    summary_path = _resolve_output_path(base_dir, outputs_cfg.get("run_summary_path"), "out/run_summary.json")
+    execution_context = build_execution_context(
+        config=config,
+        base_dir=base_dir,
+        config_path=config_path,
+        command="pricing.cli run",
+        argv=[str(config_path)],
+    )
+    write_run_summary_json(
+        summary_path,
+        config,
+        result,
+        source="run",
+        execution_context=execution_context,
+    )
     print(_format_run_output(config, result))  # 標準出力にも結果サマリを表示する
     return 0  # 正常終了コードを返す
 
@@ -183,12 +204,13 @@ def optimize_from_config(config_path: Path) -> int:  # YAML設定を使って最
     """
     Optimize loading parameters from a YAML config file.
     """
+    config_path = config_path.expanduser().resolve()
     config = _load_config(config_path)  # 設定ファイルを読み込む
-    base_dir = Path.cwd()  # 相対パス解決の基準ディレクトリを取得する
+    base_dir = resolve_base_dir_from_config(config_path)  # 相対パス解決の基準ディレクトリを取得する
     result = optimize_loading_parameters(config, base_dir=base_dir)  # 最適化を実行する
 
     outputs_cfg = config.get("outputs", {})  # 出力設定を取得する
-    log_path = base_dir / outputs_cfg.get("log_path", "out/result.log")  # ログ出力先を決める
+    log_path = _resolve_output_path(base_dir, outputs_cfg.get("log_path"), "out/result.log")
     write_optimize_log(log_path, config, result)  # 最適化ログを出力する
 
     optimized_path = outputs_cfg.get("optimized_config_path")  # 最適化後の設定保存先を取得する
@@ -208,10 +230,23 @@ def propose_change_from_config(  # 変更案を評価する
     reason: str,  # 変更理由
     out_path: Path | None,  # 出力パス（任意）
 ) -> int:
+    config_path = config_path.expanduser().resolve()
     config = _load_config(config_path)  # 設定ファイルを読み込む
-    base_dir = Path.cwd()  # 相対パス解決の基準ディレクトリを取得する
+    base_dir = resolve_base_dir_from_config(config_path)  # 相対パス解決の基準ディレクトリを取得する
+    execution_context = build_execution_context(
+        config=config,
+        base_dir=base_dir,
+        config_path=config_path,
+        command="pricing.cli propose-change",
+        argv=[str(config_path)],
+    )
     baseline_result = run_profit_test(config, base_dir=base_dir)  # 変更前の結果を計算する
-    baseline_summary = build_run_summary(config, baseline_result, source="propose_change_baseline")
+    baseline_summary = build_run_summary(
+        config,
+        baseline_result,
+        source="propose_change_baseline",
+        execution_context=execution_context,
+    )
 
     updated_config = copy.deepcopy(config)  # 変更用に深いコピーを作る
     changes: list[dict[str, object]] = []
@@ -220,7 +255,12 @@ def propose_change_from_config(  # 変更案を評価する
         changes.append({"path": key, "before": previous, "after": value})
 
     proposal_result = run_profit_test(updated_config, base_dir=base_dir)  # 変更後の結果を計算する
-    proposal_summary = build_run_summary(updated_config, proposal_result, source="propose_change_candidate")
+    proposal_summary = build_run_summary(
+        updated_config,
+        proposal_result,
+        source="propose_change_candidate",
+        execution_context=execution_context,
+    )
 
     def _metrics(summary: dict) -> dict[str, float]:
         data = summary["summary"]
@@ -251,7 +291,7 @@ def propose_change_from_config(  # 変更案を評価する
         "affected_model_points": affected,
     }
 
-    output_path = out_path or (base_dir / "out/propose_change.json")
+    output_path = _resolve_output_path(base_dir, out_path, "out/propose_change.json")
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(output, indent=2, ensure_ascii=True), encoding="utf-8")
 
@@ -286,8 +326,9 @@ def sweep_ptm_from_config(  # premium-to-maturityスイープをYAML設定から
     """
     Sweep premium-to-maturity ratios for model points and write CSV output.
     """
+    config_path = config_path.expanduser().resolve()
     config = _load_config(config_path)  # 設定ファイルを読み込む
-    base_dir = Path.cwd()  # 相対パス解決の基準ディレクトリを取得する
+    base_dir = resolve_base_dir_from_config(config_path)  # 相対パス解決の基準ディレクトリを取得する
     output_path = out_path  # 出力先を一旦受け取る
     if output_path is None:  # 出力先指定がない場合はデフォルトを使う
         output_path = (  # 全件か単独かで出力名を切り替える
@@ -295,6 +336,8 @@ def sweep_ptm_from_config(  # premium-to-maturityスイープをYAML設定から
             if all_model_points  # 全件かどうかの判定
             else base_dir / f"out/sweep_ptm_{model_point_label}.csv"  # 単独スイープ時の出力名
         )  # 出力先の決定ここまで
+    else:
+        output_path = _resolve_output_path(base_dir, output_path, "out/sweep_ptm.csv")
 
     if all_model_points:  # 全モデルポイントを対象とする場合
         try:  # 例外を捕捉してCLIの終了コードに変換する
@@ -384,6 +427,25 @@ def main(argv: list[str] | None = None) -> int:  # CLIのメイン処理を実�
     report_parser.add_argument("--irr-threshold", type=float, default=0.04)
     report_parser.add_argument("--out", type=str, default="out/feasibility_deck.yaml")
 
+    executive_parser = subparsers.add_parser(
+        "report-executive-pptx",
+        help="Generate executive PPTX and Markdown deliverables.",
+    )
+    executive_parser.add_argument("config", type=str, help="Path to config YAML.")
+    executive_parser.add_argument("--out", type=str, default="reports/executive_pricing_deck.pptx")
+    executive_parser.add_argument("--md-out", type=str, default="reports/feasibility_report.md")
+    executive_parser.add_argument(
+        "--run-summary-out", type=str, default="out/run_summary_executive.json"
+    )
+    executive_parser.add_argument(
+        "--deck-out", type=str, default="out/feasibility_deck_executive.yaml"
+    )
+    executive_parser.add_argument("--chart-dir", type=str, default="out/charts/executive")
+    executive_parser.add_argument("--r-start", type=float, default=1.0)
+    executive_parser.add_argument("--r-end", type=float, default=1.08)
+    executive_parser.add_argument("--r-step", type=float, default=0.005)
+    executive_parser.add_argument("--irr-threshold", type=float, default=0.02)
+
     propose_parser = subparsers.add_parser(
         "propose-change", help="Evaluate a parameter change without persisting it."
     )
@@ -427,6 +489,26 @@ def main(argv: list[str] | None = None) -> int:  # CLIのメイン処理を実�
             out_path=Path(args.out),
         )
         print(f"wrote: {output_path}")
+        return 0
+    if args.command == "report-executive-pptx":
+        outputs = report_executive_pptx_from_config(
+            Path(args.config),
+            out_path=Path(args.out),
+            markdown_path=Path(args.md_out),
+            run_summary_path=Path(args.run_summary_out),
+            deck_out_path=Path(args.deck_out),
+            chart_dir=Path(args.chart_dir),
+            r_start=float(args.r_start),
+            r_end=float(args.r_end),
+            r_step=float(args.r_step),
+            irr_threshold=float(args.irr_threshold),
+        )
+        print(f"wrote_pptx: {outputs.pptx_path}")
+        print(f"wrote_markdown: {outputs.markdown_path}")
+        print(f"wrote_run_summary: {outputs.run_summary_path}")
+        print(f"wrote_feasibility_deck: {outputs.feasibility_deck_path}")
+        print(f"wrote_cashflow_chart: {outputs.cashflow_chart_path}")
+        print(f"wrote_premium_chart: {outputs.premium_chart_path}")
         return 0
     if args.command == "propose-change":
         if not args.set_values:

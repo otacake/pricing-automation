@@ -105,3 +105,26 @@ def test_sweep_ptm_all_model_points_not_found(tmp_path: Path) -> None:  # 最小
     )  # 実行結果を受け取る
 
     assert all(value is None for value in min_r_by_id.values())  # 全てNoneになることを検証する
+
+
+def test_sweep_ptm_supports_loading_parameters_only(tmp_path: Path) -> None:
+    config_path = REPO_ROOT / "configs" / "trial-001.optimized.yaml"
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    config.pop("loading_alpha_beta_gamma", None)
+
+    out_path = tmp_path / "all_loading_parameters.csv"
+    df, min_r_by_id = sweep_premium_to_maturity_all(
+        config=config,
+        base_dir=REPO_ROOT,
+        start=1.0,
+        end=1.0,
+        step=0.01,
+        irr_threshold=-1.0,
+        nbv_threshold=-1.0e30,
+        loading_surplus_ratio_threshold=-1.0e30,
+        premium_to_maturity_hard_max=10.0,
+        out_path=out_path,
+    )
+
+    assert len(df) == len(load_model_points(config))
+    assert all(value is not None for value in min_r_by_id.values())

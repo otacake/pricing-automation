@@ -8,7 +8,8 @@ from typing import Mapping
 
 import yaml
 
-from .config import load_optimization_settings, loading_surplus_threshold
+from .config import load_optimization_settings, loading_surplus_threshold, read_loading_parameters
+from .paths import resolve_base_dir_from_config
 from .profit_test import DEFAULT_LAPSE_RATE, DEFAULT_VALUATION_INTEREST
 from .sweep_ptm import _calc_sweep_metrics, _iter_range, load_model_points
 
@@ -26,19 +27,44 @@ def _assumption_snapshot(config: Mapping[str, object]) -> dict[str, object]:
     )
     lapse_rate = float(profit_test_cfg.get("lapse_rate", DEFAULT_LAPSE_RATE))
 
-    loadings_cfg = config.get("loading_alpha_beta_gamma", {})
-    if not isinstance(loadings_cfg, Mapping):
-        loadings_cfg = {}
+    loading_snapshot: dict[str, object]
+    loading_params = read_loading_parameters(config)
+    if loading_params is not None:
+        loading_snapshot = {
+            "mode": "loading_parameters",
+            "loading_parameters": {
+                "a0": float(loading_params.a0),
+                "a_age": float(loading_params.a_age),
+                "a_term": float(loading_params.a_term),
+                "a_sex": float(loading_params.a_sex),
+                "b0": float(loading_params.b0),
+                "b_age": float(loading_params.b_age),
+                "b_term": float(loading_params.b_term),
+                "b_sex": float(loading_params.b_sex),
+                "g0": float(loading_params.g0),
+                "g_term": float(loading_params.g_term),
+            },
+        }
+    else:
+        loadings_cfg = config.get("loading_alpha_beta_gamma", {})
+        if not isinstance(loadings_cfg, Mapping):
+            raise ValueError(
+                "Either loading_parameters/loading_function or loading_alpha_beta_gamma is required."
+            )
+        loading_snapshot = {
+            "mode": "loading_alpha_beta_gamma",
+            "loading_alpha_beta_gamma": {
+                "alpha": float(loadings_cfg["alpha"]),
+                "beta": float(loadings_cfg["beta"]),
+                "gamma": float(loadings_cfg["gamma"]),
+            },
+        }
 
     return {
         "pricing_interest_rate": pricing_interest_rate,
         "valuation_interest_rate": valuation_interest_rate,
         "lapse_rate": lapse_rate,
-        "loading_alpha_beta_gamma": {
-            "alpha": float(loadings_cfg["alpha"]),
-            "beta": float(loadings_cfg["beta"]),
-            "gamma": float(loadings_cfg["gamma"]),
-        },
+        "loading": loading_snapshot,
     }
 
 
@@ -100,6 +126,18 @@ def _build_constraint_breakdown(
             violations.append("premium_to_maturity_hard_max")
         if metrics["nbv"] < settings.nbv_hard:
             violations.append("nbv_hard")
+        if settings.loading_surplus_hard_ratio is not None and (
+            metrics["loading_surplus_ratio"] < settings.loading_surplus_hard_ratio
+        ):
+            violations.append("loading_surplus_ratio_hard")
+        if metrics["alpha"] < 0.0:
+            violations.append("alpha_non_negative")
+        if metrics["beta"] < 0.0:
+            violations.append("beta_non_negative")
+        if metrics["gamma"] < 0.0:
+            violations.append("gamma_non_negative")
+        if metrics["loading_positive"] <= 0.0:
+            violations.append("loading_positive")
 
         rows.append(
             {
@@ -245,9 +283,13 @@ def report_feasibility_from_config(
     irr_threshold: float = 0.04,
     out_path: Path | None = None,
 ) -> Path:
+    config_path = config_path.expanduser().resolve()
     config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
-    base_dir = Path.cwd()
-    output_path = out_path or (base_dir / "out/feasibility_deck.yaml")
+    base_dir = resolve_base_dir_from_config(config_path)
+    if out_path is None:
+        output_path = base_dir / "out/feasibility_deck.yaml"
+    else:
+        output_path = out_path if out_path.is_absolute() else (base_dir / out_path)
 
     deck = build_feasibility_report(
         config=config,

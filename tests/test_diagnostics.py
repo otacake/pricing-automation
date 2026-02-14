@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pandas as pd
 
-from pricing.diagnostics import build_run_summary
+from pricing.diagnostics import build_execution_context, build_run_summary
 from pricing.endowment import EndowmentPremiums, LoadingParameters
 from pricing.profit_test import ModelPoint, ProfitTestBatchResult, ProfitTestResult
 
@@ -82,3 +84,26 @@ def test_build_run_summary_violation() -> None:
     output = build_run_summary(config, batch)
     assert output["summary"]["violation_count"] == 1
     assert output["violations"][0]["type"] == "irr_hard"
+
+
+def test_build_run_summary_with_execution_context() -> None:
+    config = {"optimization": {"irr_hard": 0.0, "premium_to_maturity_hard_max": 2.0}}
+    result = _make_result("mp1", irr=0.05)
+    summary = pd.DataFrame(
+        [
+            {
+                "model_point": "mp1",
+                "sum_assured": 1_000_000,
+                "irr": result.irr,
+                "new_business_value": result.new_business_value,
+                "loading_surplus": result.loading_surplus,
+                "premium_to_maturity_ratio": result.premium_to_maturity_ratio,
+            }
+        ]
+    )
+    batch = ProfitTestBatchResult(results=[result], summary=summary, expense_assumptions=None)
+    context = build_execution_context(config=config, base_dir=Path.cwd(), command="test")
+    output = build_run_summary(config, batch, execution_context=context)
+
+    assert "execution_context" in output["meta"]
+    assert output["meta"]["execution_context"]["command"] == "test"

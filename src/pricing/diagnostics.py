@@ -7,9 +7,13 @@ Diagnostics helpers for structured outputs.
 from datetime import datetime, timezone  # タイムスタンプ生成に使うため
 import hashlib  # 設定ハッシュ生成に使うため
 import json  # 構造化出力のため
-from typing import Any  # 型注釈に使うため
+from pathlib import Path  # ファイルパスを扱うため
+import platform  # 実行環境情報を記録するため
+import sys  # Python実行情報を記録するため
+from typing import Any, Mapping, Sequence  # 型注釈に使うため
 
 from .config import load_optimization_settings, loading_surplus_threshold  # 制約判定に使うため
+from .profit_test import _resolve_path  # 入力ファイルパスを解決するため
 from .profit_test import ProfitTestBatchResult, ProfitTestResult, model_point_label  # 結果の型を使うため
 
 
@@ -23,6 +27,71 @@ def _collect_model_point_results(result: ProfitTestBatchResult) -> dict[str, Pro
     for res in result.results:
         by_label[model_point_label(res.model_point)] = res
     return by_label
+
+
+def _file_digest(path: Path) -> dict[str, Any]:
+    if not path.is_file():
+        return {"path": str(path), "exists": False}
+
+    hasher = hashlib.sha256()
+    size_bytes = 0
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            size_bytes += len(chunk)
+            hasher.update(chunk)
+    return {
+        "path": str(path),
+        "exists": True,
+        "size_bytes": size_bytes,
+        "sha256": hasher.hexdigest(),
+    }
+
+
+def _collect_input_paths(config: dict, base_dir: Path) -> list[Path]:
+    paths: list[Path] = []
+    pricing = config.get("pricing", {})
+    if isinstance(pricing, Mapping):
+        mortality_path = pricing.get("mortality_path")
+        if isinstance(mortality_path, str):
+            paths.append(_resolve_path(base_dir, mortality_path))
+
+    profit_test_cfg = config.get("profit_test", {})
+    if isinstance(profit_test_cfg, Mapping):
+        for key in ("mortality_actual_path", "discount_curve_path"):
+            value = profit_test_cfg.get(key)
+            if isinstance(value, str):
+                paths.append(_resolve_path(base_dir, value))
+
+        expense_cfg = profit_test_cfg.get("expense_model", {})
+        if isinstance(expense_cfg, Mapping):
+            company_data_path = expense_cfg.get("company_data_path")
+            if isinstance(company_data_path, str):
+                paths.append(_resolve_path(base_dir, company_data_path))
+
+    deduped: dict[str, Path] = {}
+    for path in paths:
+        deduped[str(path)] = path
+    return list(deduped.values())
+
+
+def build_execution_context(
+    config: dict,
+    base_dir: Path,
+    config_path: Path | None = None,
+    command: str | None = None,
+    argv: Sequence[str] | None = None,
+) -> dict[str, Any]:
+    inputs = _collect_input_paths(config, base_dir)
+    return {
+        "command": command,
+        "argv": list(argv) if argv is not None else [],
+        "cwd": str(Path.cwd().resolve()),
+        "base_dir": str(base_dir.resolve()),
+        "config_path": str(config_path.resolve()) if config_path is not None else None,
+        "python_version": sys.version.split()[0],
+        "platform": platform.platform(),
+        "input_files": [_file_digest(path) for path in inputs],
+    }
 
 
 def _build_constraint_entry(  # 制約の診断行を作る
@@ -46,7 +115,12 @@ def _build_constraint_entry(  # 制約の診断行を作る
     }
 
 
-def build_run_summary(config: dict, result: ProfitTestBatchResult, source: str = "run") -> dict[str, Any]:
+def build_run_summary(
+    config: dict,
+    result: ProfitTestBatchResult,
+    source: str = "run",
+    execution_context: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
     settings = load_optimization_settings(config)
     watch_ids = set(settings.watch_model_point_ids)
     by_label = _collect_model_point_results(result)
@@ -145,12 +219,16 @@ def build_run_summary(config: dict, result: ProfitTestBatchResult, source: str =
         max(result.summary["premium_to_maturity_ratio"]) if not result.summary.empty else float("nan")
     )
 
-    return {
-        "meta": {
+    meta: dict[str, Any] = {
             "source": source,
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "config_hash": _config_hash(config),
-        },
+    }
+    if execution_context is not None:
+        meta["execution_context"] = dict(execution_context)
+
+    return {
+        "meta": meta,
         "summary": {
             "model_point_count": len(model_points),
             "watch_count": len(watch_ids),

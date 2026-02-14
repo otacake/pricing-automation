@@ -4,25 +4,14 @@ from __future__ import annotations  # 型注釈の前方参照を許可し、循
 Sweep premium-to-maturity ratios and evaluate IRR for a model point.
 """
 
+import copy  # 設定の一部を差し替えるため
 from dataclasses import dataclass  # モデルポイント情報を構造化するため
 from pathlib import Path  # パスをOS非依存で扱うため
 from typing import Iterable, Mapping  # 型注釈で入出力を明確にするため
 
 import pandas as pd  # 結果テーブルを扱うため
 
-from .commutation import build_mortality_q_by_age  # 死亡率辞書の構築に使うため
-from .endowment import calc_endowment_premiums  # 保険料計算に使うため
-from .profit_test import (  # 収益性検証の一部ロジックを再利用するため
-    DEFAULT_LAPSE_RATE,  # 失効率の既定値
-    DEFAULT_VALUATION_INTEREST,  # 評価利率の既定値
-    _forward_rates_from_spot,  # フォワードレート計算
-    _inforce_series,  # 保有率系列計算
-    _reserve_factors,  # 準備金係数計算
-    _resolve_path,  # パス解決
-    calc_irr,  # IRR計算
-    load_mortality_csv,  # 死亡率CSV読み込み
-    load_spot_curve_csv,  # スポットカーブCSV読み込み
-)
+from .profit_test import run_profit_test  # 収益性検証を共通ロジックで実行するため
 
 
 @dataclass(frozen=True)  # スイープ用モデルポイントを不変で扱うため
@@ -125,178 +114,49 @@ def _iter_range(start: float, end: float, step: float) -> list[float]:  # スイ
     return values  # 値のリストを返す
 
 
+def _model_point_to_entry(model_point: SweepModelPoint) -> dict[str, object]:
+    return {
+        "id": model_point.model_point_id,
+        "issue_age": model_point.issue_age,
+        "sex": model_point.sex,
+        "term_years": model_point.term_years,
+        "premium_paying_years": model_point.premium_paying_years,
+        "sum_assured": model_point.sum_assured,
+    }
+
+
 def _calc_sweep_metrics(  # スイープ1点の指標を計算する
     config: Mapping[str, object],  # 設定
     base_dir: Path,  # 相対パス基準
     model_point: SweepModelPoint,  # モデルポイント
     gross_annual_premium: int,  # 総保険料（年額）
 ) -> dict[str, float]:  # 指標を辞書で返す
-    pricing = config["pricing"]  # 予定利率・死亡率設定
-    loadings = config["loading_alpha_beta_gamma"]  # 直接指定のalpha/beta/gamma
-    profit_test_cfg = config.get("profit_test", {})  # 収益性検証設定
+    local_config = copy.deepcopy(dict(config))
+    local_config["model_points"] = [_model_point_to_entry(model_point)]
+    local_config.pop("model_point", None)
 
-    interest_cfg = pricing["interest"]  # 予定利率設定
-    if interest_cfg.get("type") != "flat":  # フラット利率以外は未対応
-        raise ValueError("Only flat interest rate is supported.")  # 未対応を通知する
-    pricing_interest = float(interest_cfg["flat_rate"])  # 予定利率を取得する
-    valuation_interest = float(  # 評価利率を取得する
-        profit_test_cfg.get("valuation_interest_rate", DEFAULT_VALUATION_INTEREST)
-    )  # 既定値で補完する
-    lapse_rate = float(profit_test_cfg.get("lapse_rate", DEFAULT_LAPSE_RATE))  # 失効率を取得する
+    batch_result = run_profit_test(
+        local_config,
+        base_dir=base_dir,
+        gross_annual_premium_overrides={model_point.model_point_id: gross_annual_premium},
+    )
+    result = batch_result.results[0]
 
-    alpha = float(loadings["alpha"])  # alphaを取得する
-    beta = float(loadings["beta"])  # betaを取得する
-    gamma = float(loadings["gamma"])  # gammaを取得する
-
-    pricing_mortality_path = _resolve_path(base_dir, pricing["mortality_path"])  # 予定死亡率パスを解決する
-    actual_mortality_path = _resolve_path(  # 実績死亡率パスを解決する
-        base_dir, profit_test_cfg["mortality_actual_path"]
-    )  # 実績死亡率パスの解決
-    spot_curve_path = _resolve_path(base_dir, profit_test_cfg["discount_curve_path"])  # スポットカーブパスを解決する
-
-    pricing_rows = load_mortality_csv(pricing_mortality_path)  # 予定死亡率CSVを読み込む
-    actual_rows = load_mortality_csv(actual_mortality_path)  # 実績死亡率CSVを読み込む
-    spot_curve = load_spot_curve_csv(spot_curve_path)  # スポットカーブCSVを読み込む
-    forward_rates = _forward_rates_from_spot(spot_curve, model_point.term_years)  # フォワードレートを作る
-
-    premiums = calc_endowment_premiums(  # 保険料を計算する
-        mortality_rows=pricing_rows,  # 予定死亡率
-        sex=model_point.sex,  # 性別
-        issue_age=model_point.issue_age,  # 年齢
-        term_years=model_point.term_years,  # 保険期間
-        premium_paying_years=model_point.premium_paying_years,  # 払込期間
-        interest_rate=pricing_interest,  # 予定利率
-        sum_assured=model_point.sum_assured,  # 保険金額
-        alpha=alpha,  # alpha
-        beta=beta,  # beta
-        gamma=gamma,  # gamma
-    )  # 保険料計算結果
-
-    q_pricing = build_mortality_q_by_age(pricing_rows, model_point.sex)  # 予定死亡率の辞書
-    q_actual = build_mortality_q_by_age(actual_rows, model_point.sex)  # 実績死亡率の辞書
-
-    tV_pricing, tW_pricing, _ = _reserve_factors(  # 予定準備金係数
-        q_by_age=q_pricing,  # 予定死亡率
-        issue_age=model_point.issue_age,  # 年齢
-        term_years=model_point.term_years,  # 期間
-        premium_paying_years=model_point.premium_paying_years,  # 払込期間
-        interest_rate=pricing_interest,  # 予定利率
-        alpha=alpha,  # alpha
-    )  # 予定準備金係数
-    tV_valuation, _, _ = _reserve_factors(  # 評価準備金係数
-        q_by_age=q_pricing,  # 予定死亡率
-        issue_age=model_point.issue_age,  # 年齢
-        term_years=model_point.term_years,  # 期間
-        premium_paying_years=model_point.premium_paying_years,  # 払込期間
-        interest_rate=valuation_interest,  # 評価利率
-        alpha=alpha,  # alpha
-    )  # 評価準備金係数
-
-    inforce_begin, inforce_end, death_rates, lapse_rates = _inforce_series(  # 保有率系列
-        q_by_age=q_actual,  # 実績死亡率
-        issue_age=model_point.issue_age,  # 年齢
-        term_years=model_point.term_years,  # 期間
-        lapse_rate=lapse_rate,  # 失効率
-    )  # 保有率系列
-
-    net_cfs: list[float] = []  # 純キャッシュフロー系列
-    pv_net_cf = 0.0  # NBVの計算用
-    pv_loading = 0.0  # loading現価
-    pv_expense = 0.0  # 費用現価
-
-    for t in range(model_point.term_years):  # 各年を計算する
-        if t + 1 not in spot_curve:  # スポットレートが欠損している場合
-            raise ValueError(f"Missing spot rate for t={t + 1}.")  # 欠損を通知する
-        spot_rate = spot_curve[t + 1]  # スポットレートを取得する
-        forward_rate = forward_rates[t]  # フォワードレートを取得する
-
-        inforce_beg = inforce_begin[t]  # 期首保有率
-        inforce_end_t = inforce_end[t]  # 期末保有率
-        q_t = death_rates[t]  # 死亡率
-        w_t = lapse_rates[t]  # 失効率
-
-        is_premium_year = t < model_point.premium_paying_years  # 当年が払込期間かを判定する
-
-        premium_income = (  # 保険料収入
-            gross_annual_premium * inforce_beg if is_premium_year else 0.0
-        )  # 払込期間のみ計上する
-        net_premium_income = (  # 純保険料収入
-            premiums.net_annual_premium * inforce_beg if is_premium_year else 0.0
-        )  # 払込期間のみ計上する
-        loading_income = premium_income - net_premium_income  # loading収入を計算する
-
-        death_benefit = (  # 死亡給付
-            inforce_beg * q_t * model_point.sum_assured if is_premium_year else 0.0
-        )  # 払込期間のみ計上する
-        surrender_benefit = (  # 解約返戻金
-            inforce_beg
-            * w_t
-            * (tW_pricing[t] + tW_pricing[t + 1])
-            / 2.0
-            * model_point.sum_assured
-            if is_premium_year
-            else 0.0
-        )  # 解約返戻金を計算する
-        maturity_benefit = (  # 満期給付
-            inforce_end_t * model_point.sum_assured
-            if t == model_point.term_years - 1
-            else 0.0
-        )  # 満期年のみ計上する
-
-        expenses_acq = (0.5 * alpha * model_point.sum_assured) if t == 0 else 0.0  # 獲得費を計上する
-        expenses_maint = (  # 維持費を計上する
-            inforce_beg * model_point.sum_assured * beta if is_premium_year else 0.0
-        )  # 払込期間のみ計上する
-        expenses_coll = (  # 集金費を計上する
-            inforce_beg * gross_annual_premium * gamma if is_premium_year else 0.0
-        )  # 払込期間のみ計上する
-        expenses_total = expenses_acq + expenses_maint + expenses_coll  # 総費用を合算する
-
-        reserve_change = (  # 準備金増減
-            model_point.sum_assured
-            * (inforce_end_t * tV_valuation[t + 1] - inforce_beg * tV_valuation[t])
-            if is_premium_year
-            else 0.0
-        )  # 払込期間のみ計上する
-
-        investment_income = (  # 運用収益
-            (
-                inforce_beg * tV_valuation[t] * model_point.sum_assured
-                + premium_income
-                - expenses_total
-            )
-            * forward_rate
-            - (death_benefit + surrender_benefit) * ((1.0 + forward_rate) ** 0.5 - 1.0)
-            if is_premium_year
-            else 0.0
-        )  # 払込期間のみ計上する
-
-        net_cf = (  # 純キャッシュフロー
-            premium_income
-            + investment_income
-            - (death_benefit + surrender_benefit + expenses_total + reserve_change)
-        )  # 収支を計算する
-        net_cfs.append(net_cf)  # 純キャッシュフローを追加する
-
-        spot_df = (1.0 / (1.0 + spot_rate)) ** (t + 1)  # 割引係数を計算する
-        pv_net_cf += net_cf * spot_df  # NBVを加算する
-        pv_loading += loading_income * spot_df  # loading現価を加算する
-        pv_expense += expenses_total * spot_df  # 費用現価を加算する
-
-    irr = calc_irr(net_cfs)  # IRRを計算する
-    loading_surplus = pv_loading - pv_expense  # 充足額を計算する
-
-    premium_to_maturity = (  # PTM比率を計算する
-        gross_annual_premium * model_point.premium_paying_years / model_point.sum_assured
-    )  # PTM比率
-
-    return {  # 指標を辞書で返す
-        "irr": irr,  # IRR
-        "nbv": pv_net_cf,  # NBV
-        "loading_surplus": loading_surplus,  # 充足額
-        "loading_surplus_ratio": loading_surplus / model_point.sum_assured,  # 充足比率
-        "premium_to_maturity": premium_to_maturity,  # PTM比率
-    }  # 指標の返却
+    return {
+        "irr": float(result.irr),
+        "nbv": float(result.new_business_value),
+        "loading_surplus": float(result.loading_surplus),
+        "loading_surplus_ratio": float(
+            result.loading_surplus / float(result.model_point.sum_assured)
+        ),
+        "premium_to_maturity": float(result.premium_to_maturity_ratio),
+        "alpha": float(result.loadings.alpha),
+        "beta": float(result.loadings.beta),
+        "gamma": float(result.loadings.gamma),
+        "loading_positive": float(
+            result.premiums.gross_annual_premium - result.premiums.net_annual_premium
+        ),
+    }
 
 
 def sweep_premium_to_maturity(  # 単一モデルポイントのスイープを実行する

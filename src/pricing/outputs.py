@@ -54,7 +54,7 @@ def write_profit_test_excel(path: Path, result: ProfitTestBatchResult) -> Path: 
 
     _write_cashflow_sheet(ws, first)  # キャッシュフロー詳細を出力する
 
-    summary_ws = wb.create_sheet(title="繝｢繝・Ν繝昴う繝ｳ繝亥挨繧ｵ繝槭Μ繝ｼ")  # サマリ用シートを作る
+    summary_ws = wb.create_sheet(title="model_point_summary")  # サマリ用シートを作る
     _write_summary_sheet(summary_ws, result.summary)  # サマリ表を出力する
 
     wb.save(path)  # Excelファイルとして保存する
@@ -120,18 +120,22 @@ def write_profit_test_log(  # 収益性検証のログをテキストで出力�
     path.write_text("\n".join(lines), encoding="utf-8")  # テキストとして保存する
     return path  # 保存先を返す
 
-
-
-def write_run_summary_json(  # ????????????JSON?????
-    path: Path,  # ????
-    config: dict,  # ????
-    result: ProfitTestBatchResult,  # ????
-    source: str = "run",  # ?????????
-) -> Path:  # ???????
-    path.parent.mkdir(parents=True, exist_ok=True)  # ?????????????
-    summary = build_run_summary(config, result, source=source)  # ??????????
-    path.write_text(json.dumps(summary, indent=2, ensure_ascii=True), encoding="utf-8")  # JSON??
-    return path  # ???????
+def write_run_summary_json(
+    path: Path,
+    config: dict,
+    result: ProfitTestBatchResult,
+    source: str = "run",
+    execution_context: dict[str, object] | None = None,
+) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    summary = build_run_summary(
+        config,
+        result,
+        source=source,
+        execution_context=execution_context,
+    )
+    path.write_text(json.dumps(summary, indent=2, ensure_ascii=True), encoding="utf-8")
+    return path
 
 def write_optimize_log(  # 最適化結果をテキストで出力する
     path: Path,  # ログ出力先
