@@ -1,88 +1,110 @@
-﻿# AGENTS
+# AGENTS vNext (Operating Constitution)
 
-# shell
-- Use PowerShell
-- Use encoding utf-8
+## 0. Mission
+Set prices that satisfy adequacy, profitability, and soundness at the same time, and deliver a reproducible and auditable decision package for management.
 
+## 1. North Star (Success Definition)
+- Pricing feasibility: `violation_count == 0` for non-watch and non-exempt model points.
+- Economic quality: key constraints are met (IRR, NBV, loading surplus/ratio, PTM).
+- Explainability: final pricing can be traced by formulas, coefficients, and intermediate calculations.
+- Reproducibility: same inputs and same commands can reproduce the same decision.
+- Decision readiness: management-grade Markdown and PPTX are generated.
 
-## Mission
-Set prices that satisfy adequacy, profitability, and soundness at the same time,
-and make every recommendation reproducible and explainable.
-Deliverables must include both practitioner-facing Markdown and executive-facing PPTX.
+## 2. Language Boundary (Strict)
+- Japanese allowed:
+  - Report body text in `reports/*.md`.
+  - Slide body text in `reports/*.pptx`.
+- English/ASCII only:
+  - CLI output, logs, tests, config keys, table/JSON/YAML keys, filenames.
+  - Machine-control artifacts under `out/`.
+  - Chart text (to avoid font/encoding issues).
 
-## Priority Order
-1. Correctness: keep tests passing and prevent silent failures.
-2. Reproducibility: log inputs, commands, environment, and outputs.
-3. Explainability: keep formulas, coefficients, and per-model-point calculations auditable.
-4. Delivery: produce decision-ready `.md` and `.pptx` artifacts.
-
-## Non-Negotiable Rules
-- Run `python -m pytest -q` before any `optimize` / `run` / `report-feasibility` workflow.
-- Use `configs/trial-001.yaml` unless another config is explicitly requested.
-- Avoid destructive commands (for example, `git reset --hard`).
+## 3. Non-Negotiables
+- Run `python -m pytest -q` before any optimize/run/report workflow.
+- Use `configs/trial-001.yaml` by default unless explicitly overridden.
+- Do not use destructive commands.
 - Keep generated artifacts under `out/` and `reports/`.
-- Whenever a PDCA cycle is run, update `reports/feasibility_report.md`.
-- In `reports/feasibility_report.md`, include final alpha/beta/gamma formulas, coefficients,
-  and per-model-point calculations with intermediate steps.
-- In the company expense model, negative planned expense assumptions are errors.
-  Stop immediately; do not auto-correct and continue.
+- Use timestamped output names for manual runs (for example: `*_YYYYMMDD_HHMMSS.*`).
+- Treat negative planned expense assumptions as errors and stop immediately.
+- Record watch/exempt rationale in `reports/pdca_log.md`.
 
-## Autonomous Workflow (PDCA)
-1. Plan
-- Define objective function, constraints, and watch model points.
-- Define pass criteria (for example: `violation_count == 0`, `min_irr >= threshold`, `max_ptm <= hard_max`).
+## 4. Hard Gates (Stage Exit Criteria)
+- Gate A: Data quality checks passed.
+- Gate B: Baseline run completed and `out/run_summary*.json` generated.
+- Gate C: Constraint fit achieved for non-watch/non-exempt points.
+- Gate D: Sensitivity checks completed against predefined thresholds.
+- Gate E: Reporting package (`.md` + `.pptx`) generated with traceable numbers.
 
-2. Do
-- Run baseline with `run` and `report-feasibility`.
-- Execute `optimize` / `propose-change` / `sweep-ptm` as needed.
-- Record config path, input files, command lines, and output paths for each run.
+## 5. Standard Workflow
+1. Validate data quality.
+2. Run baseline and capture diagnostics.
+3. Optimize pricing parameters.
+4. Re-run and compare before/after metrics.
+5. Execute sensitivity scenarios (interest/lapse/expense shocks).
+6. Generate management package (`.md` + `.pptx`).
+7. Append accepted/rejected options and residual risks to `reports/pdca_log.md`.
 
-3. Check
-- Validate constraints and key metrics in `out/run_summary.json`.
-- Review adequacy (loading surplus), profitability (IRR/NBV), and soundness (PTM and expense assumptions)
-  by model point.
-- For deviations, provide factor decomposition and reproducible rerun steps.
+## 6. Artifact Contract (Required Outputs Per Cycle)
+- `out/run_summary_<timestamp>.json`
+- `out/feasibility_deck_<timestamp>.yaml`
+- `out/result_<timestamp>.log`
+- `reports/feasibility_report_<timestamp>.md`
+- `reports/executive_pricing_deck_<timestamp>.pptx`
+- `reports/pdca_log.md` (append-only)
+- `out/run_manifest_<timestamp>.json` (commands, hashes, versions, environment)
 
-4. Act
-- Log accepted/rejected options and rationale in `reports/pdca_log.md`.
-- Write final formulas, coefficients, and evidence into `reports/feasibility_report.md`.
+## 7. Reproducibility Contract
+- Record:
+  - config path + hash
+  - input file paths + hashes
+  - exact commands
+  - Python version, OS, timestamp
+- Fix random seeds where applicable.
+- Ensure rerun consistency from the saved manifest.
 
-## Reproducibility Artifacts (Required)
-For each execution, save:
-- Config path and hash
-- Input file paths and hashes (mortality, spot, company expense)
-- Command line, timestamp, Python version, and platform
-- Primary outputs:
-  - `out/run_summary.json`
-  - `out/result_*.log`
-  - `out/result_*.xlsx`
-  - `out/feasibility_deck.yaml`
-  - `reports/feasibility_report.md`
-  - `reports/pdca_log.md`
+## 8. Constraint Governance
+- Adequacy: loading surplus and loading surplus ratio.
+- Profitability: IRR and NBV.
+- Soundness: PTM and expense realism.
+- Watch points are monitored points, not exemptions.
+- Exempt points require explicit reason, owner, scope, and review date.
 
-## Management Deliverables
-1. Markdown report: `reports/feasibility_report.md`
-- Recommended price and decision rationale
-- Final alpha/beta/gamma formulas and coefficients
-- Per-model-point calculations including intermediate values
-- Constraint status (adequacy / profitability / soundness)
-- Commands and rerun procedure
+## 9. Reporting Contract
+### Markdown (`reports/*.md`)
+- Recommendation and rationale.
+- Final price table `P` (annual and monthly by model point).
+- Constraint status table with worst-point gaps.
+- Final alpha/beta/gamma formulas and coefficients.
+- Per-model-point intermediate calculations.
+- Yearly cashflow decomposition by profit source (with figure links).
+- Sensitivity summary.
+- Reproducibility commands.
 
-2. Executive deck: `reports/executive_pricing_deck.pptx`
-- McKinsey-style concise storyline.
-- Minimum sections:
-  - Executive Summary
-  - Pricing Recommendation
-  - Constraint Status (Adequacy / Profitability / Soundness)
-  - Cashflow by Profit Source
-  - Sensitivity and Risks
-  - Decision Ask / Next Actions
-- Rule: one message per slide, and every quantitative claim must be traceable to reproducible evidence.
+### Executive PPTX (`reports/*.pptx`)
+- Executive Summary
+- Pricing Recommendation
+- Constraint Status
+- Cashflow by Profit Source
+- Sensitivity and Risks
+- Decision Ask / Next Actions
+- One message per slide; every quantitative claim must be traceable.
 
-## Response Format (Agent)
-- Summary of what was done
-- Metrics before/after (when applicable)
-- Tests executed
-- Files changed
-- Commands run
-- Open risks / assumptions
+## 10. Data Quality Gate (Minimum Checks)
+- Required CSV columns exist.
+- Types and units are valid.
+- No null or duplicated model point IDs.
+- `sum_assured > 0`.
+- No negative planned expense assumptions.
+
+## 11. Repository Hygiene
+- Do not leave ad-hoc scratch files at repository root.
+- Keep temporary artifacts in `out/` only.
+- Remove obsolete files not referenced by code/tests/docs.
+
+## 12. Agent Response Format
+- Summary of what was done.
+- Metrics before/after (when applicable).
+- Tests executed.
+- Files changed.
+- Commands run.
+- Open risks/assumptions.

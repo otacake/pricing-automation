@@ -15,6 +15,25 @@ from .optimize import OptimizationResult  # 最適化結果の型を参照する
 from .profit_test import ProfitTestBatchResult, ProfitTestResult, model_point_label  # 収益性検証結果の型と表示用に使うため
 
 
+def _safe_sheet_title(prefix: str, label: str, used: set[str]) -> str:
+    invalid = set(r'[]:*?/\\')
+    cleaned = "".join("_" if ch in invalid else ch for ch in label)
+    base = f"{prefix}_{cleaned}" if cleaned else prefix
+    title = base[:31]
+    if title not in used:
+        used.add(title)
+        return title
+
+    index = 2
+    while True:
+        suffix = f"_{index}"
+        candidate = f"{base[: 31 - len(suffix)]}{suffix}"
+        if candidate not in used:
+            used.add(candidate)
+            return candidate
+        index += 1
+
+
 def _write_cashflow_sheet(ws, result: ProfitTestResult) -> None:  # キャッシュフローの詳細をExcelに書く
     headers = list(result.cashflow.columns)  # DataFrameの列名を取得する
     header_row = 4  # ヘッダーの開始行を固定する
@@ -44,7 +63,7 @@ def write_profit_test_excel(path: Path, result: ProfitTestBatchResult) -> Path: 
     path.parent.mkdir(parents=True, exist_ok=True)  # 出力先ディレクトリを作成する
     wb = Workbook()  # 新しいExcelブックを作成する
     ws = wb.active  # 既定のシートを取得する
-    ws.title = "profit_test"  # シート名を設定する
+    ws.title = "profit_test"  # 互換性のため既存シート名を維持する
 
     first = result.results[0]  # 先頭モデルポイントの結果を代表として使う
     ws["A1"] = "IRR"  # IRRのラベルを設定する
@@ -53,6 +72,19 @@ def write_profit_test_excel(path: Path, result: ProfitTestBatchResult) -> Path: 
     ws["C3"] = first.new_business_value  # NBVの値を出力する
 
     _write_cashflow_sheet(ws, first)  # キャッシュフロー詳細を出力する
+
+    used_titles = {ws.title}
+    for mp_result in result.results:  # モデルポイントごとに詳細シートを作る
+        label = model_point_label(mp_result.model_point)  # ラベルを取得する
+        sheet_name = _safe_sheet_title("cashflow", label, used_titles)  # 安全なシート名を作る
+        mp_ws = wb.create_sheet(title=sheet_name)  # 詳細シートを作成する
+        mp_ws["A1"] = "model_point"  # ラベル名の見出し
+        mp_ws["B1"] = label  # モデルポイントIDを表示する
+        mp_ws["A2"] = "IRR"  # IRR見出し
+        mp_ws["B2"] = mp_result.irr  # IRR値
+        mp_ws["A3"] = "New business value"  # NBV見出し
+        mp_ws["B3"] = mp_result.new_business_value  # NBV値
+        _write_cashflow_sheet(mp_ws, mp_result)  # キャッシュフロー詳細を出力する
 
     summary_ws = wb.create_sheet(title="model_point_summary")  # サマリ用シートを作る
     _write_summary_sheet(summary_ws, result.summary)  # サマリ表を出力する
@@ -76,6 +108,7 @@ def write_profit_test_log(  # 収益性検証のログをテキストで出力�
     profit_test_cfg = config.get("profit_test", {})  # 収益性検証の設定を取得する
     constraints_cfg = config.get("constraints", {})  # 旧形式の制約設定を取得する
     expense_sufficiency = config.get("expense_sufficiency", {})  # 旧形式の費用充足設定を取得する
+    settings = load_optimization_settings(config)  # 現行の制約上限を取得する
 
     lines = [  # ログの先頭部分を作る
         "profit_test",  # セクション名
@@ -114,8 +147,8 @@ def write_profit_test_log(  # 収益性検証のログをテキストで出力�
             f"premium_to_maturity={row.premium_to_maturity_ratio}"  # PTM比率
         )  # 行の構築
         lines.append(line)  # サマリ行を追加する
-        if row.premium_to_maturity_ratio > 1.0:  # 保険料合計が満期保険金を超える場合
-            lines.append(f"warning: premium_total_exceeds_maturity {label}")  # 警告を追加する
+        if row.premium_to_maturity_ratio > settings.premium_to_maturity_hard_max:  # PTM上限超過時のみ警告する
+            lines.append(f"warning: premium_total_exceeds_hard_max {label}")  # 警告を追加する
 
     path.write_text("\n".join(lines), encoding="utf-8")  # テキストとして保存する
     return path  # 保存先を返す
@@ -238,8 +271,8 @@ def write_optimize_log(  # 最適化結果をテキストで出力する
                 f"loading_surplus_ratio={loading_ratio} "  # 比率
                 f"status=watch"  # ステータス
             )  # 行の追加
-            if row.premium_to_maturity_ratio > 1.0:  # 保険料合計が満期保険金を超える場合
-                lines.append(f"warning: premium_total_exceeds_maturity {label}")  # 警告を追加する
+            if row.premium_to_maturity_ratio > settings.premium_to_maturity_hard_max:  # PTM上限超過時のみ警告する
+                lines.append(f"warning: premium_total_exceeds_hard_max {label}")  # 警告を追加する
             continue  # 次の行へ進む
         threshold = loading_surplus_threshold(settings, int(row.sum_assured))  # 閾値を計算する
         loading_ratio = row.loading_surplus / float(row.sum_assured)  # 比率を計算する
@@ -279,8 +312,8 @@ def write_optimize_log(  # 最適化結果をテキストで出力する
                 )  # 超過分の出力
             if nbv_shortfall > 0.0:  # NBV不足の場合
                 lines.append(f"shortfall: nbv_hard {label} {nbv_shortfall:.2f}")  # 不足分を出力
-        if row.premium_to_maturity_ratio > 1.0:  # 保険料合計が満期保険金を超える場合
-            lines.append(f"warning: premium_total_exceeds_maturity {label}")  # 警告を追加する
+        if row.premium_to_maturity_ratio > settings.premium_to_maturity_hard_max:  # PTM上限超過時のみ警告する
+            lines.append(f"warning: premium_total_exceeds_hard_max {label}")  # 警告を追加する
 
     if result.failure_details:  # 最適化内部で収集した失敗詳細があれば出力する
         lines.append("constraint_failures")  # セクション見出しを追加する

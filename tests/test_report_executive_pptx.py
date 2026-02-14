@@ -30,6 +30,7 @@ def test_report_executive_pptx_generates_outputs(tmp_path: Path) -> None:
         r_step=0.01,
         irr_threshold=0.0,
         include_sensitivity=False,
+        language="ja",
     )
 
     assert outputs.pptx_path.exists()
@@ -40,5 +41,5 @@ def test_report_executive_pptx_generates_outputs(tmp_path: Path) -> None:
     assert outputs.premium_chart_path.exists()
 
     markdown = outputs.markdown_path.read_text(encoding="utf-8")
-    assert "Pricing Recommendation" in markdown
-    assert "Per-model-point alpha/beta/gamma" in markdown
+    assert "価格提案（モデルポイント別P）" in markdown
+    assert "モデルポイント別 alpha/beta/gamma 計算" in markdown

@@ -137,8 +137,8 @@ def _format_run_output(config: dict, result) -> str:  # run結果を人が読み
                 lines.append(  # shortfall情報を出力する
                     f"shortfall: nbv_hard {row.model_point} {nbv_hard - row.new_business_value:.2f}"
                 )  # 不足分を出力する
-        if row.premium_to_maturity_ratio > 1.0:  # 総保険料が満期保険金を超える場合
-            lines.append(f"warning: premium_total_exceeds_maturity {row.model_point}")  # 警告を出力する
+        if row.premium_to_maturity_ratio > premium_hard_max:  # PTM上限を超える場合のみ警告する
+            lines.append(f"warning: premium_total_exceeds_hard_max {row.model_point}")  # 警告を出力する
 
     if any(  # IRR制約が1つでも破れているか判定する
         row.irr < irr_min and row.model_point not in watch_ids  # 監視対象を除いて判定する
@@ -445,6 +445,13 @@ def main(argv: list[str] | None = None) -> int:  # CLIのメイン処理を実�
     executive_parser.add_argument("--r-end", type=float, default=1.08)
     executive_parser.add_argument("--r-step", type=float, default=0.005)
     executive_parser.add_argument("--irr-threshold", type=float, default=0.02)
+    executive_parser.add_argument(
+        "--lang",
+        type=str,
+        choices=("ja", "en"),
+        default="ja",
+        help="Language for Markdown/PPTX deliverables.",
+    )
 
     propose_parser = subparsers.add_parser(
         "propose-change", help="Evaluate a parameter change without persisting it."
@@ -502,6 +509,7 @@ def main(argv: list[str] | None = None) -> int:  # CLIのメイン処理を実�
             r_end=float(args.r_end),
             r_step=float(args.r_step),
             irr_threshold=float(args.irr_threshold),
+            language=str(args.lang),
         )
         print(f"wrote_pptx: {outputs.pptx_path}")
         print(f"wrote_markdown: {outputs.markdown_path}")

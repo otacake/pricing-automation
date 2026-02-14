@@ -10,7 +10,12 @@ import yaml
 
 from .config import load_optimization_settings, loading_surplus_threshold, read_loading_parameters
 from .paths import resolve_base_dir_from_config
-from .profit_test import DEFAULT_LAPSE_RATE, DEFAULT_VALUATION_INTEREST
+from .profit_test import (
+    DEFAULT_LAPSE_RATE,
+    DEFAULT_VALUATION_INTEREST,
+    model_point_label,
+    run_profit_test,
+)
 from .sweep_ptm import _calc_sweep_metrics, _iter_range, load_model_points
 
 
@@ -100,15 +105,19 @@ def _build_constraint_breakdown(
     config: Mapping[str, object],
     base_dir: Path,
     fixed_r: float,
+    base_gross_premium_by_id: Mapping[str, int],
 ) -> list[dict[str, object]]:
     settings = load_optimization_settings(config)
     points = load_model_points(config)
 
     rows: list[dict[str, object]] = []
     for point in points:
-        gross_annual_premium = int(
-            round(fixed_r * point.sum_assured / point.premium_paying_years, 0)
-        )
+        base_premium = int(base_gross_premium_by_id[point.model_point_id])
+        gross_annual_premium = int(round(base_premium * fixed_r, 0))
+        if gross_annual_premium <= 0:
+            raise ValueError(
+                f"Scaled premium must remain positive: {point.model_point_id}, r={fixed_r}"
+            )
         metrics = _calc_sweep_metrics(
             config=config,
             base_dir=base_dir,
@@ -155,6 +164,23 @@ def _build_constraint_breakdown(
     return rows
 
 
+def _base_gross_premium_by_id(
+    config: Mapping[str, object],
+    base_dir: Path,
+) -> dict[str, int]:
+    """
+    Build model-point base premiums from the actual pricing logic.
+
+    r in sweep is interpreted as a multiplier on these base premiums.
+    """
+    result = run_profit_test(dict(config), base_dir=base_dir)
+    by_id: dict[str, int] = {}
+    for res in result.results:
+        label = model_point_label(res.model_point)
+        by_id[label] = int(res.premiums.gross_annual_premium)
+    return by_id
+
+
 def build_feasibility_report(
     config: Mapping[str, object],
     base_dir: Path,
@@ -168,6 +194,7 @@ def build_feasibility_report(
     points = load_model_points(config)
     r_values = _iter_range(r_start, r_end, r_step)
     fixed_r_value = float(r_end if fixed_r is None else fixed_r)
+    base_gross_by_id = _base_gross_premium_by_id(config, base_dir)
 
     sweep_rows: list[dict[str, object]] = []
     min_r_by_id: dict[str, float | None] = {
@@ -176,9 +203,12 @@ def build_feasibility_report(
 
     for r_value in r_values:
         for point in points:
-            gross_annual_premium = int(
-                round(r_value * point.sum_assured / point.premium_paying_years, 0)
-            )
+            base_premium = int(base_gross_by_id[point.model_point_id])
+            gross_annual_premium = int(round(base_premium * r_value, 0))
+            if gross_annual_premium <= 0:
+                raise ValueError(
+                    f"Scaled premium must remain positive: {point.model_point_id}, r={r_value}"
+                )
             metrics = _calc_sweep_metrics(
                 config=config,
                 base_dir=base_dir,
@@ -196,6 +226,7 @@ def build_feasibility_report(
                 {
                     "model_point_id": point.model_point_id,
                     "r": r_value,
+                    "base_gross_annual_premium": base_premium,
                     "gross_annual_premium": gross_annual_premium,
                     "irr": metrics["irr"],
                     "nbv": metrics["nbv"],
@@ -218,6 +249,7 @@ def build_feasibility_report(
         config=config,
         base_dir=base_dir,
         fixed_r=fixed_r_value,
+        base_gross_premium_by_id=base_gross_by_id,
     )
 
     settings = load_optimization_settings(config)
@@ -231,6 +263,7 @@ def build_feasibility_report(
                 "r_step": float(r_step),
                 "irr_threshold": float(irr_threshold),
                 "r_count": len(r_values),
+                "r_definition": "multiplier_on_model_point_base_gross_annual_premium",
             },
             "assumptions": _assumption_snapshot(config),
             "constraints": {
@@ -243,6 +276,10 @@ def build_feasibility_report(
             "model_points": {
                 "count": len(points),
                 "ids": [point.model_point_id for point in points],
+                "base_gross_annual_premium_by_id": {
+                    point.model_point_id: int(base_gross_by_id[point.model_point_id])
+                    for point in points
+                },
             },
             "fixed_point": {
                 "r": fixed_r_value,

@@ -11,6 +11,7 @@ if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
 from pricing.report_feasibility import build_feasibility_report, report_feasibility_from_config
+from pricing.profit_test import model_point_label, run_profit_test
 
 
 def test_report_feasibility_writes_yaml(tmp_path: Path) -> None:
@@ -80,3 +81,35 @@ def test_report_feasibility_supports_loading_parameters_only() -> None:
 
     assert deck["meta"]["assumptions"]["loading"]["mode"] == "loading_parameters"
     assert len(deck["tables"]["sweep"]) == 2
+
+
+def test_report_feasibility_r_one_matches_run_base_premiums() -> None:
+    config_path = REPO_ROOT / "configs" / "trial-001.executive.optimized.yaml"
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    config["model_points"] = config["model_points"][:2]
+
+    deck = build_feasibility_report(
+        config=config,
+        base_dir=REPO_ROOT,
+        r_start=1.0,
+        r_end=1.0,
+        r_step=0.01,
+        irr_threshold=0.0,
+        config_path=config_path,
+    )
+    rows = deck["tables"]["sweep"]
+    assert len(rows) == 2
+
+    result = run_profit_test(config, base_dir=REPO_ROOT)
+    expected = {
+        model_point_label(res.model_point): int(res.premiums.gross_annual_premium)
+        for res in result.results
+    }
+    for row in rows:
+        assert int(row["gross_annual_premium"]) == expected[row["model_point_id"]]
+        assert int(row["base_gross_annual_premium"]) == expected[row["model_point_id"]]
+
+    assert (
+        deck["meta"]["scan"]["r_definition"]
+        == "multiplier_on_model_point_base_gross_annual_premium"
+    )
