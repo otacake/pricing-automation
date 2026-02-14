@@ -94,6 +94,7 @@ python -m pricing.cli run-cycle configs\trial-001.yaml --policy policy/pricing_p
 |`src/pricing/diagnostics.py`|`run_summary.json` 構造化出力|
 |`src/pricing/report_feasibility.py`|実現可能性YAMLデッキ生成|
 |`src/pricing/report_executive_pptx.py`|Markdown + PPTXの生成|
+|`docs/script_relationships.md`|スクリプト間の関係メモ（入口->計算->出力）|
 |`configs/*.yaml`|実験設定|
 |`data/*.csv`|入力データ|
 |`out/`|実行出力（中間・分析用）|
