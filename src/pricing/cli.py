@@ -26,10 +26,23 @@ from .report_executive_pptx import report_executive_pptx_from_config  # 経営�
 from .report_feasibility import report_feasibility_from_config  # Feasibility report generation
 from .pdca_cycle import run_pdca_cycle
 from .sweep_ptm import sweep_premium_to_maturity, sweep_premium_to_maturity_all  # premium-to-maturityのスイープ処理を呼ぶため
+from .validation import (
+    format_validation_issues,
+    has_validation_errors,
+    validate_config,
+)
 
 
 def _load_config(path: Path) -> dict:  # YAMLを読み込んで辞書に変換する補助関数
     return yaml.safe_load(path.read_text(encoding="utf-8"))  # ファイルをUTF-8で読み、YAMLを安全にパースする
+
+
+def _validate_config_or_exit(config: dict, *, context: str) -> None:
+    issues = validate_config(config)
+    for line in format_validation_issues(issues, prefix=context):
+        print(line)
+    if has_validation_errors(issues):
+        raise SystemExit(f"{context}: configuration validation failed.")
 
 
 def _parse_set_arguments(raw_values: list[str]) -> list[tuple[str, object]]:  # --set 引数を解析する
@@ -173,6 +186,7 @@ def run_from_config(config_path: Path) -> int:  # YAML設定を使ってprofit t
     """
     config_path = config_path.expanduser().resolve()
     config = _load_config(config_path)  # 設定ファイルを読み込む
+    _validate_config_or_exit(config, context="pricing.cli run")
     base_dir = resolve_base_dir_from_config(config_path)  # 相対パス解決の基準ディレクトリを取得する
     result = run_profit_test(config, base_dir=base_dir)  # 収益性検証を実行する
 
@@ -207,6 +221,7 @@ def optimize_from_config(config_path: Path) -> int:  # YAML設定を使って最
     """
     config_path = config_path.expanduser().resolve()
     config = _load_config(config_path)  # 設定ファイルを読み込む
+    _validate_config_or_exit(config, context="pricing.cli optimize")
     base_dir = resolve_base_dir_from_config(config_path)  # 相対パス解決の基準ディレクトリを取得する
     result = optimize_loading_parameters(config, base_dir=base_dir)  # 最適化を実行する
 
@@ -233,6 +248,7 @@ def propose_change_from_config(  # 変更案を評価する
 ) -> int:
     config_path = config_path.expanduser().resolve()
     config = _load_config(config_path)  # 設定ファイルを読み込む
+    _validate_config_or_exit(config, context="pricing.cli propose-change")
     base_dir = resolve_base_dir_from_config(config_path)  # 相対パス解決の基準ディレクトリを取得する
     execution_context = build_execution_context(
         config=config,
@@ -254,6 +270,7 @@ def propose_change_from_config(  # 変更案を評価する
     for key, value in updates:
         previous = _apply_config_update(updated_config, key, value)
         changes.append({"path": key, "before": previous, "after": value})
+    _validate_config_or_exit(updated_config, context="pricing.cli propose-change(candidate)")
 
     proposal_result = run_profit_test(updated_config, base_dir=base_dir)  # 変更後の結果を計算する
     proposal_summary = build_run_summary(
@@ -329,6 +346,7 @@ def sweep_ptm_from_config(  # premium-to-maturityスイープをYAML設定から
     """
     config_path = config_path.expanduser().resolve()
     config = _load_config(config_path)  # 設定ファイルを読み込む
+    _validate_config_or_exit(config, context="pricing.cli sweep-ptm")
     base_dir = resolve_base_dir_from_config(config_path)  # 相対パス解決の基準ディレクトリを取得する
     output_path = out_path  # 出力先を一旦受け取る
     if output_path is None:  # 出力先指定がない場合はデフォルトを使う
@@ -512,6 +530,8 @@ def main(argv: list[str] | None = None) -> int:  # CLIのメイン処理を実�
         )  # sweep-ptmを実行する
 
     if args.command == "report-feasibility":  # report-feasibility command
+        config = _load_config(Path(args.config).expanduser().resolve())
+        _validate_config_or_exit(config, context="pricing.cli report-feasibility")
         output_path = report_feasibility_from_config(
             Path(args.config),
             r_start=float(args.r_start),
@@ -523,6 +543,8 @@ def main(argv: list[str] | None = None) -> int:  # CLIのメイン処理を実�
         print(f"wrote: {output_path}")
         return 0
     if args.command == "report-executive-pptx":
+        config = _load_config(Path(args.config).expanduser().resolve())
+        _validate_config_or_exit(config, context="pricing.cli report-executive-pptx")
         outputs = report_executive_pptx_from_config(
             Path(args.config),
             out_path=Path(args.out),

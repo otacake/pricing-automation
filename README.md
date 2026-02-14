@@ -320,6 +320,7 @@ python -m pricing.cli run-cycle <config.yaml> --policy policy/pricing_policy.yam
 
 - 速く探すなら `rg` を使う
 - 変更後は `python -m pytest -q`
+- 文字コード健全性チェックは `python scripts/check_utf8_encoding.py --root .`
 - 既存の運用ルールは `AGENTS.md` を参照
 
 ---

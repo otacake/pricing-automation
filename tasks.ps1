@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory = $true, Position = 0)]
-    [ValidateSet("test", "baseline", "optimize", "run", "sweep", "feasibility", "executive", "cycle")]
+    [ValidateSet("test", "baseline", "optimize", "run", "sweep", "feasibility", "executive", "cycle", "encoding")]
     [string]$Task,
     [string]$Config = "configs/trial-001.yaml",
     [string]$Policy = "policy/pricing_policy.yaml",
@@ -43,6 +43,10 @@ switch ($Task) {
     }
     "cycle" {
         python -m pricing.cli run-cycle $Config --policy $Policy
+        break
+    }
+    "encoding" {
+        python scripts/check_utf8_encoding.py --root .
         break
     }
 }

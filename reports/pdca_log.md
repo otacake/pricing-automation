@@ -97,3 +97,15 @@
 - final_violation_count: `0`
 - optimization_applied: `false`
 - manifest: `C:/Users/shunsuke/pricing-automation/out/run_manifest_20260214_162654.json`
+## PDCA Cycle 20260214_164606
+- config: `C:/Users/shunsuke/pricing-automation/configs/trial-001.yaml`
+- policy: `C:/Users/shunsuke/pricing-automation/policy/pricing_policy.yaml`
+- baseline_violation_count: `6`
+- final_violation_count: `0`
+- optimization_applied: `true`
+- manifest: `C:/Users/shunsuke/pricing-automation/out/run_manifest_20260214_164606.json`
+- watch_rationale:
+  - `male_age50_term20` remains in watch list as configured in `configs/trial-001.yaml`.
+  - Rationale: governance continuity with prior runs; monitored separately even after final `violation_count=0`.
+- exempt_rationale:
+  - none (exemption disabled in this cycle).

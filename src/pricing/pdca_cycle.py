@@ -27,6 +27,11 @@ from .policy import load_auto_cycle_policy
 from .profit_test import run_profit_test
 from .report_executive_pptx import report_executive_pptx_from_config
 from .report_feasibility import report_feasibility_from_config
+from .validation import (
+    format_validation_issues,
+    has_validation_errors,
+    validate_config,
+)
 
 
 @dataclass(frozen=True)
@@ -100,6 +105,14 @@ def _append_pdca_log(
         handle.write("\n".join(lines))
 
 
+def _validate_or_raise(config: dict, *, context: str) -> None:
+    issues = validate_config(config)
+    for line in format_validation_issues(issues, prefix=context):
+        print(line)
+    if has_validation_errors(issues):
+        raise ValueError(f"{context}: configuration validation failed.")
+
+
 def run_pdca_cycle(
     config_path: Path,
     *,
@@ -131,6 +144,7 @@ def run_pdca_cycle(
         commands.append({"command": [sys.executable, "-m", "pytest", "-q"], "skipped": True})
 
     config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    _validate_or_raise(config, context="pricing.cli run-cycle")
     execution_context = build_execution_context(
         config=config,
         base_dir=base_dir,
@@ -171,6 +185,7 @@ def run_pdca_cycle(
         write_optimized_config(config, optimize_result, optimized_config_path)
         active_config_path = optimized_config_path
         active_config = yaml.safe_load(active_config_path.read_text(encoding="utf-8"))
+        _validate_or_raise(active_config, context="pricing.cli run-cycle(optimized)")
         active_result = run_profit_test(active_config, base_dir=base_dir)
         commands.append({"step": "final_run", "config_path": str(active_config_path)})
     else:

@@ -151,7 +151,12 @@ def load_company_expense_assumptions(  # 会社費用CSVから単価等を推定
     inforce_avg = float(row["inforce_avg"])  # 平均保有件数を取得する
     premium_income = float(row["premium_income"])  # 保険料収入を取得する
     if new_policies <= 0 or inforce_avg <= 0 or premium_income <= 0:  # 分母が0以下は不正
-        raise ValueError("Company expense denominators must be positive.")  # 早期にエラーを出す
+        row_year = int(row["year"]) if "year" in row else None
+        raise ValueError(
+            "Company expense denominators must be positive. "
+            f"year={row_year}, "
+            f"new_policies={new_policies}, inforce_avg={inforce_avg}, premium_income={premium_income}"
+        )  # 早期にエラーを出す
 
     acq_per_policy = (  # 獲得費単価を推定する
         float(row["acq_var_total"])  # 獲得変動費
@@ -166,7 +171,12 @@ def load_company_expense_assumptions(  # 会社費用CSVから単価等を推定
     coll_rate = float(row["coll_var_total"]) / premium_income  # 集金費率を計算する
 
     if acq_per_policy < 0 or maint_per_policy < 0 or coll_rate < 0:  # 予定事業費は負値不可
-        raise ValueError("Company expense assumptions must be non-negative.")
+        row_year = int(row["year"]) if "year" in row else None
+        raise ValueError(
+            "Company expense assumptions must be non-negative. "
+            f"year={row_year}, acq_per_policy={acq_per_policy}, "
+            f"maint_per_policy={maint_per_policy}, coll_rate={coll_rate}"
+        )
 
     return ExpenseAssumptions(  # 推定結果をデータクラスにまとめて返す
         year=int(row["year"]),  # 年

@@ -24,6 +24,21 @@ from .profit_test import ProfitTestBatchResult, model_point_label, run_profit_te
 from .sweep_ptm import sweep_premium_to_maturity_all  # 免除判断用のsweepに使うため
 
 
+def _params_cache_key(params: LoadingFunctionParams) -> tuple[float, ...]:
+    return (
+        float(params.a0),
+        float(params.a_age),
+        float(params.a_term),
+        float(params.a_sex),
+        float(params.b0),
+        float(params.b_age),
+        float(params.b_term),
+        float(params.b_sex),
+        float(params.g0),
+        float(params.g_term),
+    )
+
+
 @dataclass(frozen=True)  # 最適化結果を不変で保持するため
 class OptimizationResult:  # 最適化の結果をまとめる
     """
@@ -88,8 +103,15 @@ def _evaluate(  # 係数候補を評価して目的関数・制約違反を計�
     stage_vars: list[str],  # 対象係数
     exempt_model_points: set[str],  # 免除対象
     watch_model_points: set[str],  # 監視対象
+    profit_cache: dict[tuple[float, ...], ProfitTestBatchResult] | None = None,
 ) -> CandidateEvaluation:  # 候補評価結果を返す
-    result = run_profit_test(config, base_dir=base_dir, loading_params=params)  # 収益性検証を実行する
+    cache_key = _params_cache_key(params)
+    if profit_cache is not None and cache_key in profit_cache:
+        result = profit_cache[cache_key]
+    else:
+        result = run_profit_test(config, base_dir=base_dir, loading_params=params)  # 収益性検証を実行する
+        if profit_cache is not None:
+            profit_cache[cache_key] = result
 
     irr_penalty = 0.0  # IRRペナルティの初期化
     premium_penalty = 0.0  # PTMペナルティの初期化
@@ -280,6 +302,7 @@ def _run_stage(  # 1ステージ分の探索を実行する
     max_iterations: int,  # 最大評価回数
     exempt_model_points: set[str],  # 免除対象
     watch_model_points: set[str],  # 監視対象
+    profit_cache: dict[tuple[float, ...], ProfitTestBatchResult] | None = None,
 ) -> tuple[CandidateEvaluation, int]:  # 最良候補と評価回数を返す
     stage_vars = list(dict.fromkeys(stage.variables))  # 重複を除いた係数一覧を作る
     current_params = params  # 現在の係数を初期化する
@@ -291,6 +314,7 @@ def _run_stage(  # 1ステージ分の探索を実行する
         stage_vars,  # 対象係数
         exempt_model_points,  # 免除対象
         watch_model_points,  # 監視対象
+        profit_cache,  # 評価キャッシュ
     )  # 評価結果
     iterations = 1  # 評価回数を初期化する
 
@@ -316,6 +340,7 @@ def _run_stage(  # 1ステージ分の探索を実行する
                     stage_vars,  # 対象係数
                     exempt_model_points,  # 免除対象
                     watch_model_points,  # 監視対象
+                    profit_cache,  # 評価キャッシュ
                 )  # 評価結果
                 iterations += 1  # 評価回数を増やす
                 if _is_better_candidate(candidate_eval, current_eval, settings):  # 改善なら更新する
@@ -389,6 +414,7 @@ def _optimize_once(  # 係数探索のメイン関数
     current_params = base_params  # 現在係数を初期化する
     total_iterations = 0  # 評価回数を初期化する
     best_eval: CandidateEvaluation | None = None  # 最良評価を初期化する
+    profit_cache: dict[tuple[float, ...], ProfitTestBatchResult] = {}
 
     for stage in settings.stages:  # ステージごとに探索する
         stage_eval, iterations = _run_stage(  # ステージ探索を実行する
@@ -400,6 +426,7 @@ def _optimize_once(  # 係数探索のメイン関数
             settings.max_iterations_per_stage,  # 評価回数上限
             exempt_set,  # 免除対象
             watch_set,  # 監視対象
+            profit_cache,  # 評価キャッシュ
         )  # ステージ評価結果
         total_iterations += iterations  # 評価回数を累計する
         current_params = stage_eval.params  # 係数を更新する
