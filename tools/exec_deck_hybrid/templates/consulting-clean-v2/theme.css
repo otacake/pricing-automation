@@ -1,0 +1,121 @@
+:root {
+  --color-primary: {{COLOR_PRIMARY}};
+  --color-secondary: {{COLOR_SECONDARY}};
+  --color-accent: {{COLOR_ACCENT}};
+  --color-positive: {{COLOR_POSITIVE}};
+  --color-negative: {{COLOR_NEGATIVE}};
+  --color-background: {{COLOR_BACKGROUND}};
+  --color-text: {{COLOR_TEXT}};
+  --color-grid: {{COLOR_GRID}};
+  --font-ja: "{{FONT_JA}}", "{{FONT_JA_FALLBACK}}", sans-serif;
+  --font-en: "{{FONT_EN}}", "{{FONT_EN_FALLBACK}}", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 24px;
+  background:
+    radial-gradient(circle at 8% 10%, rgba(11, 95, 165, 0.08) 0%, rgba(11, 95, 165, 0) 36%),
+    linear-gradient(160deg, #f9fbff 0%, #eef3f8 100%);
+  color: var(--color-text);
+  font-family: var(--font-ja);
+}
+
+.deck {
+  display: grid;
+  gap: 16px;
+}
+
+.slide {
+  border: 1px solid var(--color-grid);
+  border-radius: 12px;
+  padding: 20px 22px;
+  background: #ffffff;
+  box-shadow: 0 10px 28px rgba(17, 24, 39, 0.08);
+}
+
+.slide-header {
+  border-left: 6px solid var(--color-primary);
+  padding-left: 12px;
+  margin-bottom: 16px;
+}
+
+.slide h1,
+.slide h2 {
+  margin: 0;
+  font-family: var(--font-en);
+  color: var(--color-primary);
+}
+
+.slide h3 {
+  margin: 14px 0 8px;
+  font-size: 0.95rem;
+  font-family: var(--font-en);
+  color: var(--color-secondary);
+}
+
+.headline {
+  font-size: 1.15rem;
+  margin: 8px 0 16px;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.card {
+  border: 1px solid var(--color-grid);
+  border-radius: 10px;
+  padding: 11px 13px;
+  background: var(--color-background);
+}
+
+.card .label {
+  display: block;
+  color: var(--color-secondary);
+  font-size: 0.8rem;
+}
+
+.card .value {
+  display: block;
+  margin-top: 5px;
+  font-family: var(--font-en);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  border: 1px solid var(--color-grid);
+  padding: 8px 9px;
+  text-align: left;
+  font-size: 0.85rem;
+}
+
+th {
+  background: rgba(11, 95, 165, 0.08);
+  color: var(--color-primary);
+  font-family: var(--font-en);
+}
+
+.narrative-list {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.narrative-list li {
+  margin: 3px 0;
+  font-size: 0.84rem;
+}

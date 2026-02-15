@@ -26,7 +26,7 @@ def test_load_auto_cycle_policy_defaults(tmp_path: Path) -> None:
     assert policy.feasibility.enabled is True
     assert policy.reporting.report_language == "ja"
     assert policy.reporting.chart_language == "en"
-    assert policy.reporting.pptx_theme == "consulting-clean"
+    assert policy.reporting.pptx_theme == "consulting-clean-v2"
     assert policy.reporting.style_contract_path == "docs/deck_style_contract.md"
     assert policy.reporting.strict_quality_gate is True
     assert policy.reporting.decision_compare.enabled is True
@@ -43,7 +43,7 @@ def test_repo_policy_file_is_loadable() -> None:
     policy = load_auto_cycle_policy(policy_path)
     assert policy.reporting.report_language in ("ja", "en")
     assert policy.reporting.chart_language in ("ja", "en")
-    assert policy.reporting.pptx_theme == "consulting-clean"
+    assert policy.reporting.pptx_theme == "consulting-clean-v2"
     assert policy.reporting.decision_compare.counter_objective
 
 
@@ -70,4 +70,4 @@ def test_load_auto_cycle_policy_accepts_html_hybrid_as_legacy_alias(tmp_path: Pa
     policy_path.write_text(yaml.safe_dump(policy_payload, sort_keys=False), encoding="utf-8")
 
     policy = load_auto_cycle_policy(policy_path)
-    assert policy.reporting.pptx_theme == "consulting-clean"
+    assert policy.reporting.pptx_theme == "consulting-clean-v2"

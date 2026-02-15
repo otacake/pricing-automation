@@ -276,6 +276,79 @@ def _build_cashflow_insights(rows: list[dict[str, Any]], language: str) -> list[
     ]
 
 
+def _build_speaker_notes(slide_id: str, block: Mapping[str, Any], *, language: str) -> str:
+    if not isinstance(block, Mapping):
+        return ""
+    conclusion = str(block.get("conclusion", "")).strip()
+    rationale = [str(item).strip() for item in block.get("rationale", []) if str(item).strip()]
+    risks = [str(item).strip() for item in block.get("risk", []) if str(item).strip()]
+    asks = [str(item).strip() for item in block.get("decision_ask", []) if str(item).strip()]
+    if not conclusion and not rationale and not risks and not asks:
+        return ""
+
+    lines: list[str] = [f"slide_id: {slide_id}"]
+    if conclusion:
+        lines.append(f"Conclusion: {conclusion}")
+    for idx, item in enumerate(rationale, start=1):
+        lines.append(f"Rationale {idx}: {item}")
+    for item in risks:
+        lines.append(f"Risk: {item}")
+    for item in asks:
+        lines.append(f"Decision ask: {item}")
+    return "\n".join(lines)
+
+def _build_slide_meta(
+    *,
+    style_contract: DeckStyleContract,
+    management_narrative: Mapping[str, Any],
+    language: str,
+) -> list[dict[str, Any]]:
+    slide_defs = style_contract.frontmatter["slides"]
+    notes_mode = style_contract.frontmatter["narrative"].get("notes_mode", "auto_from_narrative")
+    meta: list[dict[str, Any]] = []
+
+    for slide in slide_defs:
+        slide_id = str(slide["id"])
+        title = str(slide["title"])
+        block = management_narrative.get(slide_id, {})
+        speaker_notes = (
+            _build_speaker_notes(slide_id, block, language=language)
+            if notes_mode == "auto_from_narrative"
+            else ""
+        )
+        meta.append(
+            {
+                "slide_id": slide_id,
+                "title": title,
+                "master": "main_master",
+                "alt_text_coverage_target": 1.0,
+                "speaker_notes": speaker_notes,
+                "table_overflow_policy": style_contract.frontmatter["tables"]["overflow_policy"],
+            }
+        )
+
+    appendices = [
+        ("appendix_a1_expense_formula", "Appendix A1 Expense Formula"),
+        ("appendix_a2_decision_compare", "Appendix A2 Decision Compare"),
+        ("appendix_a3_causal_bridge", "Appendix A3 Causal Bridge"),
+        ("appendix_a4_sensitivity_decomposition", "Appendix A4 Sensitivity Decomposition"),
+        ("appendix_a5_procon", "Appendix A5 Pro/Con"),
+        ("appendix_a6_audit_trail", "Appendix A6 Audit Trail"),
+    ]
+    for slide_id, title in appendices:
+        meta.append(
+            {
+                "slide_id": slide_id,
+                "title": title,
+                "master": "appendix_master",
+                "alt_text_coverage_target": 1.0,
+                "speaker_notes": "",
+                "table_overflow_policy": style_contract.frontmatter["tables"]["overflow_policy"],
+            }
+        )
+    return meta
+
+
 def build_executive_deck_spec(
     *,
     config: Mapping[str, Any],
@@ -345,6 +418,11 @@ def build_executive_deck_spec(
         narrative_contract=style_contract.frontmatter["narrative"],
         decision_compare=decision_compare_payload,
     )
+    slide_meta = _build_slide_meta(
+        style_contract=style_contract,
+        management_narrative=management_narrative,
+        language=language,
+    )
 
     return {
         "meta": {
@@ -372,6 +450,10 @@ def build_executive_deck_spec(
             config_path=config_path,
             language=language,
         ),
+        "slide_meta": slide_meta,
+        "table_rendering": dict(style_contract.frontmatter["tables"]),
+        "chart_rendering": dict(style_contract.frontmatter["charts"]),
+        "accessibility": dict(style_contract.frontmatter["accessibility"]),
         "alternatives": alternatives_payload,
         "decision_compare": decision_compare_payload,
         "procon": explainability_payload.get("procon", {}),

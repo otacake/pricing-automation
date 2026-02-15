@@ -481,8 +481,8 @@ def main(argv: list[str] | None = None) -> int:  # CLIのメイン処理を実�
     executive_parser.add_argument(
         "--theme",
         type=str,
-        default="consulting-clean",
-        help="Theme name for the fixed PptxGenJS deck backend.",
+        default="consulting-clean-v2",
+        help="Theme name for the fixed PptxGenJS deck backend (consulting-clean-v2).",
     )
     executive_parser.add_argument(
         "--style-contract",

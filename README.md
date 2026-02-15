@@ -71,7 +71,7 @@ python -m pricing.cli run configs\trial-001.yaml
 
 ```powershell
 python -m pricing.cli report-executive-pptx configs\trial-001.executive.optimized.yaml `
-  --theme consulting-clean `
+  --theme consulting-clean-v2 `
   --style-contract docs/deck_style_contract.md `
   --decision-compare on `
   --counter-objective maximize_min_irr `
@@ -100,6 +100,10 @@ python -m pricing.cli report-executive-pptx configs\trial-001.executive.optimize
 - `main_narrative_coverage`（全本文で必須セクションが揃っているか）
 - `main_narrative_density_ok`（最低行数を満たしているか）
 - `decision_style_ok`（結論先出し構造が維持されているか）
+- `alt_text_coverage`（チャート/画像の代替テキストが付与されているか）
+- `speaker_notes_coverage`（本文スライドに発表ノートが付与されているか）
+- `table_overflow_ok`（表がはみ出さずにレンダリングできるか）
+- `unique_titles_ok`（スライドタイトルが一意か）
 
 またはPDCAを一括実行:
 
@@ -154,6 +158,32 @@ python -m pricing.cli run-cycle configs\trial-001.yaml --policy policy/pricing_p
 - `--counter-objective maximize_min_irr`
 - `--explainability-strict`
 - 生成: `out/explainability_report*.json`, `out/decision_compare*.json`
+
+### Design Quality Checklist（consulting-clean-v2）
+
+- 9枚本文 + 付録A1-A6を維持している
+- `Decision Statement` が推奨案/対向案の比較専用になっている
+- 本文で `conclusion -> rationale -> risk -> decision_ask` が揃っている
+- 主要チャート/画像に `altText` が付いている
+- 本文スライドに `speaker notes` が付いている
+- 表がはみ出さず（`autoPage`）に表示される
+- `out/executive_deck_quality*.json` の新指標が `true`
+
+### テンプレート変数（style contract）
+
+- `layout.master_variant`: masterの種類（`consulting_clean_v2`）
+- `visual.icon_style`: アイコン方針（線画など）
+- `tables.auto_page_default`: 表の自動ページ分割有無
+- `charts.value_label_default`: グラフ値ラベル表示
+- `accessibility.require_alt_text`: altText必須化
+- `narrative.notes_mode`: ノート生成方針（`auto_from_narrative`）
+
+### デザイン変更手順（style contract中心）
+
+1. `docs/deck_style_contract.md` の frontmatter を編集（色・余白・フォント・narrative）。
+2. `python -m pricing.cli report-executive-pptx ... --theme consulting-clean-v2 --style-contract docs/deck_style_contract.md` を再実行。
+3. `reports/executive_pricing_deck_preview.html` で見た目を確認。
+4. `out/executive_deck_quality.json` の `passed: true` を確認。
 
 ---
 
@@ -272,7 +302,7 @@ python -m pricing.cli report-executive-pptx <config.yaml> `
   --run-summary-out out/run_summary_executive.json `
   --deck-out out/feasibility_deck_executive.yaml `
   --chart-dir out/charts/executive `
-  --theme consulting-clean `
+  --theme consulting-clean-v2 `
   --style-contract docs/deck_style_contract.md `
   --spec-out out/executive_deck_spec.json `
   --preview-html-out reports/executive_pricing_deck_preview.html `
@@ -293,10 +323,11 @@ python -m pricing.cli report-executive-pptx <config.yaml> `
 python -m pricing.cli run-cycle <config.yaml> --policy policy/pricing_policy.yaml
 ```
 
-### Breaking Change: PPTX Backend
+### Breaking Change: PPTX Backend / Theme
 
 - 旧: `report-executive-pptx --engine legacy`
 - 新: `--engine` オプションは廃止。PPTX生成は常に PptxGenJS バックエンド
+- 推奨テーマ: `consulting-clean-v2`（互換エイリアス `consulting-clean` は利用可能）
 - policy移行:
   - `reporting.pptx_engine` は削除
   - 既存policyで `pptx_engine: legacy` がある場合はエラー停止

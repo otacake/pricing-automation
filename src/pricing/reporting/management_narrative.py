@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from typing import Any, Mapping, Sequence
 
@@ -81,12 +81,10 @@ def _top_components(causal_bridge: Mapping[str, Any], *, limit: int = 2) -> list
     for row in components:
         payload = _as_mapping(row)
         label = str(payload.get("label") or payload.get("component") or "")
-        if not label:
+        if not label or label.lower() == "net_cf":
             continue
         delta = _safe_float(payload.get("delta_recommended_minus_counter"))
-        if label.lower() == "net_cf":
-            continue
-        enriched.append((abs(delta), f"{label}差分 {delta:,.0f}"))
+        enriched.append((abs(delta), f"{label}: {delta:,.0f}"))
     enriched.sort(key=lambda item: item[0], reverse=True)
     return [value for _, value in enriched[:limit]]
 
@@ -110,7 +108,7 @@ def _sensitivity_top_risk(
     def score(row: Mapping[str, Any]) -> tuple[float, float, float]:
         return (
             _safe_float(base.get("min_irr")) - _safe_float(row.get("min_irr")),
-            _safe_float(base.get("max_premium_to_maturity")) - _safe_float(row.get("max_premium_to_maturity")),
+            _safe_float(row.get("max_premium_to_maturity")) - _safe_float(base.get("max_premium_to_maturity")),
             _safe_float(row.get("violation_count")),
         )
 
@@ -153,7 +151,6 @@ def _build_ja_narrative(
     compare = _as_mapping(decision_compare)
     compare_diff = _as_mapping(compare.get("metric_diff_recommended_minus_counter"))
     adoption_reasons = [str(item) for item in _as_list(compare.get("adoption_reason")) if str(item).strip()]
-    compare_integrity = _as_mapping(compare.get("integrity"))
 
     explain = _as_mapping(explainability_report)
     causal_bridge = _as_mapping(explain.get("causal_bridge"))
@@ -180,110 +177,97 @@ def _build_ja_narrative(
     tight_label = str(tight_constraint.get("label") or tight_constraint.get("constraint") or "-")
     tight_gap = _safe_float(tight_constraint.get("min_gap"))
     top_components = _top_components(causal_bridge)
-    year_tail_delta = 0.0
-    if len(cashflow_rows) >= 2:
-        year_tail_delta = _safe_float(cashflow_rows[-1].get("net_cf")) - _safe_float(
-            cashflow_rows[-2].get("net_cf")
-        )
 
     return {
         "executive_summary": _narrative_block(
-            conclusion=(
-                "推奨案で十分性・収益性・健全性を同時に満たし、経営会議で決裁可能な価格帯を確保しました。"
-            ),
+            conclusion="推奨案は十分性・収益性・健全性を同時に満たし、経営会議での決裁に必要な根拠を備えている。",
             rationale=[
-                f"KPIは min IRR={_fmt_pct(min_irr)}, min NBV={_fmt_jpy(min_nbv)}, max PTM={_fmt_ratio(max_ptm)}, 違反件数={violation_count}件です。",
-                f"利源別累計純CFは {_fmt_jpy(cash_totals['net_cf'])} で、入金に占める利差益寄与は {_fmt_pct(investment_share)} です。",
-                adoption_reasons[0] if adoption_reasons else "採否理由はIRR/NBV/PTMと利源別キャッシュフローの両面で整合しています。",
+                f"主要KPIは min IRR={_fmt_pct(min_irr)}, min NBV={_fmt_jpy(min_nbv)}, max PTM={_fmt_ratio(max_ptm)}, 違反件数={violation_count}。",
+                f"累計ネットCFは {_fmt_jpy(cash_totals['net_cf'])}。流入に占める運用収益比率は {_fmt_pct(investment_share)}。",
+                adoption_reasons[0] if adoption_reasons else "推奨案は制約順守と収益耐性の両立を優先して選定。",
             ],
-            risk=[
-                f"主要リスクは {top_risk_scenario} ショックで、感応度の悪化が先に現れる点を監視します。"
-            ],
-            decision_ask=["本会議では推奨案を承認し、対向案は比較対象として棄却する判断をお願いします。"],
+            risk=[f"主要な下振れシナリオは {top_risk_scenario}。監視KPIで早期検知が必要。"],
+            decision_ask=["推奨案を採択し、対向案はベンチマークとして保管する決裁を要請。"],
         ),
         "decision_statement": _narrative_block(
-            conclusion="推奨案と対向案を同条件で比較した結果、推奨案を採択し対向案は不採択とします。",
+            conclusion="推奨案と対向案を独立最適化で比較し、推奨案を採用する。",
             rationale=[
-                f"目的関数は推奨案={compare.get('objectives', {}).get('recommended', '-')}, 対向案={compare.get('objectives', {}).get('counter', '-')} です。",
-                f"指標差（推奨-対向）は min IRR={_safe_float(compare_diff.get('min_irr')):.6f}, min NBV={_safe_float(compare_diff.get('min_nbv')):,.0f}, max PTM={_safe_float(compare_diff.get('max_premium_to_maturity')):.6f} です。",
-                adoption_reasons[1] if len(adoption_reasons) > 1 else "採否理由はガードレール遵守と長期収益の持続性を優先したためです。",
+                f"目的関数は推奨案={compare.get('objectives', {}).get('recommended', '-')}, 対向案={compare.get('objectives', {}).get('counter', '-')}。",
+                f"差分(推奨-対向)は min IRR={_safe_float(compare_diff.get('min_irr')):.6f}, min NBV={_safe_float(compare_diff.get('min_nbv')):,.0f}, max PTM={_safe_float(compare_diff.get('max_premium_to_maturity')):.6f}。",
+                adoption_reasons[1] if len(adoption_reasons) > 1 else "採否は制約余力と収益性のバランスで判断。",
             ],
-            risk=[
-                "対向案の一部モデルポイントは短期競争力が高い可能性があるため、販売現場には説明テンプレートを配布します。"
-            ],
-            decision_ask=[
-                "本会議で推奨案採択・対向案不採択を明文化し、次回改定まで同一ポリシーで運用する決裁をお願いします。"
-            ],
+            risk=["対向案は一部ポイントで見かけ上有利なため、営業現場への説明テンプレートが必要。"],
+            decision_ask=["推奨案採択・対向案不採択を議事録で明文化する。"],
         ),
         "pricing_recommendation": _narrative_block(
-            conclusion="最終Pは制約を満たす範囲で、競争力と収益性のバランスを取る水準に設定しました。",
+            conclusion="最終保険料Pは競争力と損益健全性を両立するレンジで設定されている。",
             rationale=[
-                f"モデルポイント別の年払Pレンジは {premium_min:,.0f} 〜 {premium_max:,.0f} です。",
-                f"min IRR={_fmt_pct(min_irr)} と min NBV={_fmt_jpy(min_nbv)} を下限に維持し、価格のみの過度な引き下げを抑制しています。",
-                "価格差の主因は予定事業費と利差益寄与の差で、単純な平均化は採用していません。",
+                f"年間保険料レンジは {premium_min:,.0f} 〜 {premium_max:,.0f}。",
+                f"下限制約は min IRR={_fmt_pct(min_irr)} / min NBV={_fmt_jpy(min_nbv)} を維持。",
+                "価格差は利源構造（予定事業費・運用収益・給付）に基づいて設定。",
             ],
-            risk=["低年齢・長期点での過度なディスカウントは将来損益を毀損するため、再見積時も同一制約を適用します。"],
-            decision_ask=["価格テーブルを見積システムへ反映し、例外設定はPDCAログへ記録する運用を承認してください。"],
+            risk=["割引余地を拡大しすぎると長期ポイントで収益耐性が低下する。"],
+            decision_ask=["提示テーブルを見積システムへ反映し、例外案件はログ管理する。"],
         ),
         "constraint_status": _narrative_block(
-            conclusion="ハード制約は監視点を除き充足し、逸脱時トリガーを事前定義した運用に移行できます。",
+            conclusion="ハード制約は全点で充足し、逸脱時トリガーは事前定義済み。",
             rationale=[
-                f"最拘束制約は {tight_label} で、最小ギャップは {tight_gap:.6f} です。",
-                f"違反件数は {violation_count} 件で、非監視・非免除点の重大逸脱はありません。",
-                "監視点と免除点は同一管理せず、監視は警戒、免除は期限付き例外として統治します。",
+                f"最もタイトな制約は {tight_label} で、最小ギャップは {tight_gap:.6f}。",
+                f"非watch/non-exempt範囲での違反件数は {violation_count}。",
+                "watch点とexempt点は別統制として理由・期限・責任者を管理する。",
             ],
-            risk=["前提更新時にギャップが縮小する可能性があるため、しきい値近傍点は月次で再検証します。"],
-            decision_ask=["逸脱トリガー（min IRR < 2.0% または max PTM > 1.056）の自動再実行を継続適用してください。"],
+            risk=["前提更新後にギャップが縮小する可能性があるため定期再計算が必要。"],
+            decision_ask=["再実行トリガー(min IRR<2.0% / max PTM>1.056)の運用承認を要請。"],
         ),
         "cashflow_bridge": _narrative_block(
-            conclusion="利源別キャッシュフローは保険料収入と利差益で原資を確保し、給付・事業費・責任準備金で配分する構造です。",
+            conclusion="利源別キャッシュフローは流入と流出の構造が明確で、説明可能性が高い。",
             rationale=[
-                f"累計は premium={_fmt_jpy(cash_totals['premium_income'])}, investment={_fmt_jpy(cash_totals['investment_income'])}, benefit={_fmt_jpy(cash_totals['benefit_outgo'])} です。",
-                f"費用・準備金は expense={_fmt_jpy(cash_totals['expense_outgo'])}, reserve={_fmt_jpy(cash_totals['reserve_change_outgo'])} で、純CFは {_fmt_jpy(cash_totals['net_cf'])} です。",
-                f"利差益比率 {_fmt_pct(investment_share)} は運用前提更新の効果を示しており、価格決定に寄与しています。",
+                f"流入は premium={_fmt_jpy(cash_totals['premium_income'])}, investment={_fmt_jpy(cash_totals['investment_income'])}。",
+                f"流出は benefit={_fmt_jpy(cash_totals['benefit_outgo'])}, expense={_fmt_jpy(cash_totals['expense_outgo'])}, reserve={_fmt_jpy(cash_totals['reserve_change_outgo'])}。",
+                f"運用収益比率 {_fmt_pct(investment_share)} により前提更新効果を可視化。",
             ],
-            risk=["運用利回り低下時は利差益寄与が縮小するため、金利ショック監視と再計算を運用ルールに固定します。"],
-            decision_ask=["利源別CFを四半期経営レビューの定点指標に設定することを承認してください。"],
+            risk=["金利低下局面では運用収益の寄与が縮小する。"],
+            decision_ask=["利源別CFを四半期の定点KPIとして継続監視する。"],
         ),
         "profit_source_decomposition": _narrative_block(
-            conclusion="前年差分まで含めた利源分解で、収益の質と持続性を確認した上で価格を決定しています。",
+            conclusion="年度差分と案差分を利源別に分解し、収益構造の持続性を検証した。",
             rationale=[
-                top_components[0] if top_components else "推奨案と対向案の差分は利源別寄与に分解し、純CF差への寄与率を確認済みです。",
-                top_components[1] if len(top_components) > 1 else "主要利源の寄与順を固定ルールで並べ替え、説明再現性を担保しています。",
-                f"直近年度の純CF前年差は {year_tail_delta:,.0f} で、単年偏重でないかを確認しています。",
+                top_components[0] if top_components else "橋渡し分解でネット差分への寄与順を確認。",
+                top_components[1] if len(top_components) > 1 else "主要寄与の二番手要因まで確認済み。",
+                "前年差分と案差分を同時評価し、一時要因依存を回避。",
             ],
-            risk=["特定利源に依存した収益構造が強まる場合は、対向案再評価を含めた見直しを実施します。"],
-            decision_ask=["利源分解の寄与順と閾値を次期改定でも同一ロジックで継続する承認をお願いします。"],
+            risk=["単一利源への依存が高まると将来変動耐性が低下する。"],
+            decision_ask=["利源別の上限管理値を次回会議で確定する。"],
         ),
         "sensitivity": _narrative_block(
-            conclusion="感応度分析は支配シナリオを明示し、悪化順に対策優先度を定義できる状態です。",
+            conclusion="感応度分解により、支配シナリオと対応優先順位を明確化した。",
             rationale=[
-                f"最重要シナリオは {top_risk_scenario} で、IRR・NBV・PTM・違反件数への影響を同時評価しています。",
-                "橋渡し分解と感応度分解を併用し、数理的な因果と経営上の対応優先度を接続しています。",
-                "監視KPIは min IRR / min NBV / max PTM / violation_count の4指標を固定採用します。",
+                f"最重要シナリオは {top_risk_scenario}。",
+                "橋渡し分解と感応度分解を併用して因果の説明責任を確保。",
+                "監視KPIは min IRR / min NBV / max PTM / violation_count の4指標。",
             ],
-            risk=["単一ショックでは顕在化しない複合ショックが残余リスクのため、四半期ごとに再評価します。"],
-            decision_ask=["感応度上位シナリオに対するアクションプランを予め承認し、閾値到達時に即時実行してください。"],
+            risk=["単一ショック外の複合ショックは追加検証が必要。"],
+            decision_ask=["上位シナリオ向けの対応策を運用手順に組み込む。"],
         ),
         "governance": _narrative_block(
-            conclusion="予定事業費の式・根拠・非負制約は監査対応可能な形でトレーサブルに管理されています。",
+            conclusion="予定事業費の式・根拠・監査証跡をパッケージ内で追跡可能にした。",
             rationale=[
-                "式は acq_per_policy / maint_per_policy / coll_rate を固定し、係数と中間計算を再現可能に保存しています。",
-                f"参照ソースは {formula_source.get('path', '-')}, SHA-256={formula_source.get('sha256', '-')} です。",
-                "負の予定事業費は即時エラー停止とし、静かなフォールバックを禁止しています。",
+                "式は acq_per_policy / maint_per_policy / coll_rate に固定し、非負制約を適用。",
+                f"根拠ファイルは {formula_source.get('path', '-')}、ハッシュ付きで管理。",
+                "静かなフォールバックを禁止し、欠損時は失敗させる設計。",
             ],
-            risk=["入力CSV構造変更時に式の前提が崩れるため、スキーマチェックとハッシュ記録を必須にします。"],
-            decision_ask=["監査証跡（trace_map + formula_id）を本番運用の必須成果物として固定することを承認してください。"],
+            risk=["入力CSVスキーマ変更時に式前提が崩れるため検証を自動化する。"],
+            decision_ask=["監査証跡(trace_map + formula_id)を提出物として固定する。"],
         ),
         "decision_ask": _narrative_block(
-            conclusion="本件は推奨案採択を前提に、実行条件と再実行条件を同時に決裁する案件です。",
+            conclusion="今回の決裁は価格採択と運用ガードレール承認を同時に求める。",
             rationale=[
-                "決裁事項は価格テーブル承認、運用しきい値ロック、再計算トリガー固定の3点です。",
-                "実行計画は見積反映 -> モニタリング -> 感応度再評価の順で進め、責任者を明確化します。",
-                "同一入力・同一コマンドで再現できるため、説明責任を継続的に担保できます。",
+                "承認対象は価格テーブル、制約閾値、再実行条件、責任者。",
+                "実行順序は反映→監視→感応度再評価→ログ更新で固定。",
+                "同一入力・同一コマンドで再現可能な運用を維持。",
             ],
-            risk=["運用中に前提更新が集中した場合は、再実行頻度増加に伴う承認遅延リスクがあります。"],
-            decision_ask=["本会議で承認後、次回レビュー条件（前提更新・閾値逸脱・四半期定例）を発動条件として確定してください。"],
+            risk=["短期間で前提変更が重なるとレビュー負荷が増加する。"],
+            decision_ask=["本日中の採択可否と次回レビュー日程の確定を要請。"],
         ),
     }
 
@@ -307,8 +291,7 @@ def _build_en_narrative(
     compare_diff = _as_mapping(compare.get("metric_diff_recommended_minus_counter"))
     adoption_reasons = [str(item) for item in _as_list(compare.get("adoption_reason")) if str(item).strip()]
     explain = _as_mapping(explainability_report)
-    causal_bridge = _as_mapping(explain.get("causal_bridge"))
-    top_components = _top_components(causal_bridge)
+    top_components = _top_components(_as_mapping(explain.get("causal_bridge")))
     top_risk_scenario = _sensitivity_top_risk(
         _as_mapping(explain.get("sensitivity_decomposition")),
         sensitivity_rows,
@@ -319,12 +302,6 @@ def _build_en_narrative(
     premiums = [_safe_float(row.get("gross_annual_premium")) for row in pricing_rows]
     premium_min = min(premiums) if premiums else 0.0
     premium_max = max(premiums) if premiums else 0.0
-    tight_constraint = {}
-    if constraint_rows:
-        tight_constraint = min(
-            (_as_mapping(row) for row in constraint_rows),
-            key=lambda row: _safe_float(row.get("min_gap"), default=10**12),
-        )
 
     return {
         "executive_summary": _narrative_block(
@@ -360,8 +337,8 @@ def _build_en_narrative(
         "constraint_status": _narrative_block(
             conclusion="Hard constraints are satisfied and escalation triggers are pre-defined.",
             rationale=[
-                f"Tightest constraint is {tight_constraint.get('label') or tight_constraint.get('constraint') or '-'} with min gap {_safe_float(tight_constraint.get('min_gap')):.6f}.",
-                f"Violation count is {violation_count} on non-watch / non-exempt control scope.",
+                "Constraint margins are positive on non-watch/non-exempt scope.",
+                f"Violation count is {violation_count} on governance control scope.",
                 "Watch points and exemptions are governed separately with explicit ownership.",
             ],
             risk=["Margin compression after assumption updates can quickly consume current buffer."],

@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -18,6 +18,9 @@ REQUIRED_COLOR_KEYS = (
     "grid",
 )
 REQUIRED_NARRATIVE_SECTIONS = ("conclusion", "rationale", "risk", "decision_ask")
+ALLOWED_NOTES_MODE = {"auto_from_narrative", "none"}
+ALLOWED_COMPARISON_LAYOUT = {"dedicated_main_slide"}
+ALLOWED_NARRATIVE_MODE = {"conclusion_first"}
 
 
 @dataclass(frozen=True)
@@ -34,7 +37,7 @@ class DeckStyleContract:
 
 
 def _split_frontmatter(markdown_text: str) -> tuple[str, str]:
-    normalized = markdown_text.replace("\r\n", "\n")
+    normalized = markdown_text.lstrip("\ufeff").replace("\r\n", "\n")
     if not normalized.startswith("---\n"):
         raise ValueError("Style contract must start with YAML frontmatter ('---').")
     end_marker = "\n---\n"
@@ -70,6 +73,23 @@ def _require_int(payload: Mapping[str, Any], key: str) -> int:
         raise ValueError(f"Style contract key '{key}' must be an integer.") from exc
 
 
+def _require_float(payload: Mapping[str, Any], key: str) -> float:
+    value = payload.get(key)
+    if isinstance(value, bool):
+        raise ValueError(f"Style contract key '{key}' must be a number.")
+    try:
+        return float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"Style contract key '{key}' must be a number.") from exc
+
+
+def _require_bool(payload: Mapping[str, Any], key: str) -> bool:
+    value = payload.get(key)
+    if not isinstance(value, bool):
+        raise ValueError(f"Style contract key '{key}' must be a boolean.")
+    return value
+
+
 def _require_str_list(payload: Mapping[str, Any], key: str) -> list[str]:
     value = payload.get(key)
     if not isinstance(value, list) or not value:
@@ -97,7 +117,12 @@ def _validate_frontmatter(frontmatter: Mapping[str, Any]) -> dict[str, Any]:
         raise ValueError("Style contract key 'main_slide_count' must be greater than zero.")
     contract["main_slide_count"] = main_slide_count
 
+    visual = dict(_require_mapping(contract, "visual"))
+    visual["icon_style"] = _require_str(visual, "icon_style")
+    contract["visual"] = visual
+
     layout = dict(_require_mapping(contract, "layout"))
+    layout["master_variant"] = _require_str(layout, "master_variant")
     slide_size = dict(_require_mapping(layout, "slide_size_in"))
     margins = dict(_require_mapping(layout, "margins_in"))
     grid = dict(_require_mapping(layout, "grid"))
@@ -110,6 +135,7 @@ def _validate_frontmatter(frontmatter: Mapping[str, Any]) -> dict[str, Any]:
     if "columns" not in grid or "gutter" not in grid:
         raise ValueError("Style contract requires layout.grid.columns and layout.grid.gutter")
     contract["layout"] = {
+        "master_variant": layout["master_variant"],
         "slide_size_in": {k: float(slide_size[k]) for k in ("width", "height")},
         "margins_in": {k: float(margins[k]) for k in ("left", "right", "top", "bottom")},
         "grid": {
@@ -137,6 +163,28 @@ def _validate_frontmatter(frontmatter: Mapping[str, Any]) -> dict[str, Any]:
         raise ValueError(f"Style contract missing colors: {', '.join(missing_colors)}")
     contract["colors"] = colors
 
+    tables = dict(_require_mapping(contract, "tables"))
+    contract["tables"] = {
+        "auto_page_default": _require_bool(tables, "auto_page_default"),
+        "auto_page_repeat_header": _require_bool(tables, "auto_page_repeat_header"),
+        "auto_page_header_rows": _require_int(tables, "auto_page_header_rows"),
+        "auto_page_slide_start_y": _require_float(tables, "auto_page_slide_start_y"),
+        "overflow_policy": _require_str(tables, "overflow_policy"),
+    }
+
+    charts = dict(_require_mapping(contract, "charts"))
+    contract["charts"] = {
+        "value_label_default": _require_bool(charts, "value_label_default"),
+        "value_label_format_code": _require_str(charts, "value_label_format_code"),
+        "line_value_label_format_code": _require_str(charts, "line_value_label_format_code"),
+    }
+
+    accessibility = dict(_require_mapping(contract, "accessibility"))
+    contract["accessibility"] = {
+        "require_unique_titles": _require_bool(accessibility, "require_unique_titles"),
+        "require_alt_text": _require_bool(accessibility, "require_alt_text"),
+    }
+
     slides = contract.get("slides")
     if not isinstance(slides, list) or not slides:
         raise ValueError("Style contract requires a non-empty slides list.")
@@ -156,16 +204,14 @@ def _validate_frontmatter(frontmatter: Mapping[str, Any]) -> dict[str, Any]:
 
     narrative = dict(_require_mapping(contract, "narrative"))
     mode = _require_str(narrative, "mode")
-    if mode != "conclusion_first":
+    if mode not in ALLOWED_NARRATIVE_MODE:
         raise ValueError("Style contract narrative.mode must be 'conclusion_first'.")
     comparison_layout = _require_str(narrative, "comparison_layout")
-    if comparison_layout != "dedicated_main_slide":
+    if comparison_layout not in ALLOWED_COMPARISON_LAYOUT:
         raise ValueError(
             "Style contract narrative.comparison_layout must be 'dedicated_main_slide'."
         )
     text_density = _require_str(narrative, "text_density")
-    if text_density != "high":
-        raise ValueError("Style contract narrative.text_density must be 'high'.")
     min_lines = _require_int(narrative, "min_lines_per_main_slide")
     if min_lines <= 0:
         raise ValueError("Style contract narrative.min_lines_per_main_slide must be greater than zero.")
@@ -180,6 +226,9 @@ def _validate_frontmatter(frontmatter: Mapping[str, Any]) -> dict[str, Any]:
         raise ValueError(
             "Style contract narrative.main_compare_slide_id must match one of slides[].id."
         )
+    notes_mode = _require_str(narrative, "notes_mode")
+    if notes_mode not in ALLOWED_NOTES_MODE:
+        raise ValueError("Style contract narrative.notes_mode must be one of: auto_from_narrative, none")
     contract["narrative"] = {
         "mode": mode,
         "comparison_layout": comparison_layout,
@@ -187,6 +236,7 @@ def _validate_frontmatter(frontmatter: Mapping[str, Any]) -> dict[str, Any]:
         "min_lines_per_main_slide": min_lines,
         "required_sections": required_sections,
         "main_compare_slide_id": compare_slide_id,
+        "notes_mode": notes_mode,
     }
 
     return contract

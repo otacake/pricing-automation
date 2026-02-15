@@ -117,9 +117,15 @@ def _validate_language(language: str) -> str:
 
 def _validate_theme(theme: str) -> str:
     normalized = str(theme).strip().lower()
-    if normalized != "consulting-clean":
-        raise ValueError(f"Unsupported theme: {theme}. Use 'consulting-clean'.")
-    return normalized
+    aliases = {
+        "consulting-clean": "consulting-clean-v2",
+        "consulting-clean-v2": "consulting-clean-v2",
+    }
+    if normalized not in aliases:
+        raise ValueError(
+            f"Unsupported theme: {theme}. Use 'consulting-clean-v2' (or alias 'consulting-clean')."
+        )
+    return aliases[normalized]
 
 
 def _normalize_decision_compare(value: str | bool) -> bool:
@@ -847,7 +853,7 @@ def report_executive_pptx_from_config(
     include_sensitivity: bool = True,
     language: str = "ja",
     chart_language: str = "en",
-    theme: str = "consulting-clean",
+    theme: str = "consulting-clean-v2",
     style_contract_path: Path | None = None,
     spec_out_path: Path | None = None,
     preview_html_path: Path | None = None,

@@ -18,6 +18,10 @@ class QualityGateResult:
     main_narrative_coverage: float
     main_narrative_density_ok: bool
     decision_style_ok: bool
+    alt_text_coverage: float
+    speaker_notes_coverage: float
+    table_overflow_ok: bool
+    unique_titles_ok: bool
     thresholds: dict[str, float]
     checks: dict[str, bool]
     details: dict[str, Any]
@@ -36,6 +40,10 @@ class QualityGateResult:
             "main_narrative_coverage": self.main_narrative_coverage,
             "main_narrative_density_ok": self.main_narrative_density_ok,
             "decision_style_ok": self.decision_style_ok,
+            "alt_text_coverage": self.alt_text_coverage,
+            "speaker_notes_coverage": self.speaker_notes_coverage,
+            "table_overflow_ok": self.table_overflow_ok,
+            "unique_titles_ok": self.unique_titles_ok,
             "thresholds": self.thresholds,
             "checks": self.checks,
             "details": self.details,
@@ -63,6 +71,8 @@ def evaluate_quality_gate(
     max_runtime_seconds: float = 180.0,
     min_causal_chain_coverage: float = 1.0,
     min_main_narrative_coverage: float = 1.0,
+    min_alt_text_coverage: float = 1.0,
+    min_speaker_notes_coverage: float = 1.0,
 ) -> QualityGateResult:
     trace_rows = spec.get("trace_map", [])
     trace_items = trace_rows if isinstance(trace_rows, list) else []
@@ -76,10 +86,33 @@ def evaluate_quality_gate(
     editable_shapes = int(_safe_float(render_metrics.get("editable_shape_count"), default=0.0))
     editable_ratio = 0.0 if total_shapes <= 0 else (editable_shapes / total_shapes)
 
+    alt_text_total = int(_safe_float(render_metrics.get("alt_text_total"), default=0.0))
+    alt_text_present = int(_safe_float(render_metrics.get("alt_text_present"), default=0.0))
+    alt_text_coverage = 1.0 if alt_text_total <= 0 else (alt_text_present / alt_text_total)
+
+    notes_total = int(_safe_float(render_metrics.get("speaker_notes_total"), default=0.0))
+    notes_present = int(_safe_float(render_metrics.get("speaker_notes_present"), default=0.0))
+    speaker_notes_coverage = 1.0 if notes_total <= 0 else (notes_present / notes_total)
+
+    table_overflow_ok = bool(render_metrics.get("table_overflow_ok", True))
+
+    slide_meta = spec.get("slide_meta", [])
+    slide_meta_rows = slide_meta if isinstance(slide_meta, list) else []
+    titles = [
+        str(row.get("title", "")).strip()
+        for row in slide_meta_rows
+        if isinstance(row, Mapping) and str(row.get("title", "")).strip()
+    ]
+    unique_titles_ok = len(titles) == len(set(titles)) and len(titles) == len(slide_meta_rows)
+
     checks = {
         "traceability": trace_coverage >= min_numeric_trace_coverage,
         "editability": editable_ratio >= min_editable_shape_ratio,
         "runtime": runtime_seconds <= max_runtime_seconds,
+        "alt_text_coverage": alt_text_coverage >= min_alt_text_coverage,
+        "speaker_notes_coverage": speaker_notes_coverage >= min_speaker_notes_coverage,
+        "table_overflow_ok": table_overflow_ok,
+        "unique_titles_ok": unique_titles_ok,
     }
     explainability = explainability_report if isinstance(explainability_report, Mapping) else {}
     compare = decision_compare if isinstance(decision_compare, Mapping) else {}
@@ -126,12 +159,20 @@ def evaluate_quality_gate(
         "max_runtime_seconds": max_runtime_seconds,
         "min_causal_chain_coverage": min_causal_chain_coverage,
         "min_main_narrative_coverage": min_main_narrative_coverage,
+        "min_alt_text_coverage": min_alt_text_coverage,
+        "min_speaker_notes_coverage": min_speaker_notes_coverage,
     }
     details = {
         "trace_item_count": len(trace_items),
         "traced_item_count": traced,
         "total_shape_count": total_shapes,
         "editable_shape_count": editable_shapes,
+        "alt_text_total": alt_text_total,
+        "alt_text_present": alt_text_present,
+        "speaker_notes_total": notes_total,
+        "speaker_notes_present": notes_present,
+        "slide_title_count": len(titles),
+        "unique_slide_title_count": len(set(titles)),
         "strict_explainability": strict_explainability,
         "decision_compare_enabled": decision_compare_enabled,
         "main_slide_checks": main_slide_checks,
@@ -140,6 +181,10 @@ def evaluate_quality_gate(
         checks["traceability"]
         and checks["editability"]
         and checks["runtime"]
+        and checks["alt_text_coverage"]
+        and checks["speaker_notes_coverage"]
+        and checks["table_overflow_ok"]
+        and checks["unique_titles_ok"]
     )
     explainability_passed = (
         checks["causal_chain_coverage"]
@@ -164,6 +209,10 @@ def evaluate_quality_gate(
         main_narrative_coverage=_safe_float(main_slide_checks.get("coverage"), default=0.0),
         main_narrative_density_ok=bool(checks["main_narrative_density_ok"]),
         decision_style_ok=bool(checks["decision_style_ok"]),
+        alt_text_coverage=alt_text_coverage,
+        speaker_notes_coverage=speaker_notes_coverage,
+        table_overflow_ok=table_overflow_ok,
+        unique_titles_ok=unique_titles_ok,
         thresholds=thresholds,
         checks=checks,
         details=details,

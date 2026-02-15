@@ -33,6 +33,7 @@ Set prices that satisfy adequacy, profitability, and soundness at the same time,
 - Treat negative planned expense assumptions as errors and stop immediately.
 - Record watch/exempt rationale in `reports/pdca_log.md`.
 - Use `report-executive-pptx` with the fixed PptxGenJS backend (no engine switch).
+- Default deck theme is `consulting-clean-v2` (alias `consulting-clean` is accepted for compatibility).
 - Use `report-executive-pptx --decision-compare on --counter-objective maximize_min_irr` as default.
 - Keep explainability strict gate enabled (`--explainability-strict` / policy `reporting.explainability.strict_gate: true`).
 - Keep `docs/deck_style_contract.md` as the single source of deck style.
@@ -112,6 +113,7 @@ Set prices that satisfy adequacy, profitability, and soundness at the same time,
 - Main-body slides must follow `conclusion -> rationale -> risk -> decision_ask` with at least 6 lines per slide.
 - `Decision Statement` is dedicated to recommended vs counter comparison in the main body.
 - Preferred PPT backend: `PptxGenJS` (editable PPT-native objects).
+- Use slide masters (`main_master` / `appendix_master`) and keep body content editable.
 - Must satisfy quality gate:
   - `numeric_trace_coverage >= 1.0`
   - `editable_shape_ratio >= 0.80`
@@ -124,6 +126,10 @@ Set prices that satisfy adequacy, profitability, and soundness at the same time,
   - `main_narrative_coverage == 1.0`
   - `main_narrative_density_ok == true`
   - `decision_style_ok == true`
+  - `alt_text_coverage == 1.0`
+  - `speaker_notes_coverage == 1.0`
+  - `table_overflow_ok == true`
+  - `unique_titles_ok == true`
 
 ## 10. Data Quality Gate (Minimum Checks)
 - Required CSV columns exist.

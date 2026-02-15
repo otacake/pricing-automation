@@ -93,9 +93,16 @@ def load_auto_cycle_policy(path: Path) -> AutoCyclePolicy:
         if normalized_engine not in ("", "html_hybrid"):
             raise ValueError("reporting.pptx_engine must be omitted or set to 'html_hybrid'.")
 
-    pptx_theme = str(reporting_cfg.get("pptx_theme", "consulting-clean")).strip().lower()
-    if pptx_theme != "consulting-clean":
-        raise ValueError("pptx_theme must be 'consulting-clean'.")
+    pptx_theme_raw = str(reporting_cfg.get("pptx_theme", "consulting-clean-v2")).strip().lower()
+    theme_aliases = {
+        "consulting-clean": "consulting-clean-v2",
+        "consulting-clean-v2": "consulting-clean-v2",
+    }
+    if pptx_theme_raw not in theme_aliases:
+        raise ValueError(
+            "pptx_theme must be 'consulting-clean-v2' (or alias 'consulting-clean')."
+        )
+    pptx_theme = theme_aliases[pptx_theme_raw]
 
     style_contract_path = str(
         reporting_cfg.get("style_contract_path", "docs/deck_style_contract.md")

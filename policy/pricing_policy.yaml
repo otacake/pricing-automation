@@ -13,7 +13,7 @@ reporting:
   generate_executive_pptx: true
   report_language: ja
   chart_language: en
-  pptx_theme: consulting-clean
+  pptx_theme: consulting-clean-v2
   style_contract_path: docs/deck_style_contract.md
   strict_quality_gate: true
   decision_compare:

@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Executive Pricing Deck Preview</title>
+    <style>
+{{THEME_CSS}}
+    </style>
+  </head>
+  <body>
+    <main class="deck">
+      <section class="slide">
+        <header class="slide-header">
+          <h1>Executive Summary</h1>
+        </header>
+        <p class="headline">{{HEADLINE}}</p>
+        <div class="cards">
+{{SUMMARY_CARDS}}
+        </div>
+        <h3>Management Narrative</h3>
+        <ul class="narrative-list">
+{{NARRATIVE_EXEC_SUMMARY}}
+        </ul>
+      </section>
+
+      <section class="slide">
+        <header class="slide-header">
+          <h2>Decision Statement (2 Alternatives)</h2>
+        </header>
+        <p>{{COMPARE_OBJECTIVES}}</p>
+        <ul>
+{{COMPARE_SUMMARY}}
+        </ul>
+        <h3>Management Narrative</h3>
+        <ul class="narrative-list">
+{{NARRATIVE_DECISION_STATEMENT}}
+        </ul>
+      </section>
+
+      <section class="slide">
+        <header class="slide-header">
+          <h2>Pricing Recommendation</h2>
+        </header>
+        <table>
+          <thead>
+            <tr>
+              <th>Model Point</th>
+              <th>Annual P</th>
+              <th>Monthly P</th>
+              <th>IRR</th>
+              <th>NBV</th>
+              <th>PTM</th>
+            </tr>
+          </thead>
+          <tbody>
+{{PRICING_ROWS}}
+          </tbody>
+        </table>
+        <h3>Management Narrative</h3>
+        <ul class="narrative-list">
+{{NARRATIVE_PRICING_RECOMMENDATION}}
+        </ul>
+      </section>
+
+      <section class="slide">
+        <header class="slide-header">
+          <h2>Constraint Status</h2>
+        </header>
+        <table>
+          <thead>
+            <tr>
+              <th>Constraint</th>
+              <th>Threshold</th>
+              <th>Min Gap</th>
+              <th>Worst Model Point</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+{{CONSTRAINT_ROWS}}
+          </tbody>
+        </table>
+        <h3>Management Narrative</h3>
+        <ul class="narrative-list">
+{{NARRATIVE_CONSTRAINT_STATUS}}
+        </ul>
+      </section>
+
+      <section class="slide">
+        <header class="slide-header">
+          <h2>Sensitivity and Risks</h2>
+        </header>
+        <table>
+          <thead>
+            <tr>
+              <th>Scenario</th>
+              <th>Min IRR</th>
+              <th>Min NBV</th>
+              <th>Max PTM</th>
+              <th>Violations</th>
+            </tr>
+          </thead>
+          <tbody>
+{{SENSITIVITY_ROWS}}
+          </tbody>
+        </table>
+        <h3>Management Narrative</h3>
+        <ul class="narrative-list">
+{{NARRATIVE_SENSITIVITY}}
+        </ul>
+      </section>
+
+      <section class="slide">
+        <header class="slide-header">
+          <h2>Causal Bridge</h2>
+        </header>
+        <table>
+          <thead>
+            <tr>
+              <th>Component</th>
+              <th>Recommended</th>
+              <th>Counter</th>
+              <th>Delta</th>
+            </tr>
+          </thead>
+          <tbody>
+{{CAUSAL_ROWS}}
+          </tbody>
+        </table>
+      </section>
+
+      <section class="slide">
+        <header class="slide-header">
+          <h2>Main Slide Quality Check</h2>
+        </header>
+        <table>
+          <thead>
+            <tr>
+              <th>Slide ID</th>
+              <th>Line Count</th>
+              <th>Sections</th>
+              <th>Density</th>
+              <th>Order</th>
+            </tr>
+          </thead>
+          <tbody>
+{{MAIN_SLIDE_CHECK_ROWS}}
+          </tbody>
+        </table>
+        <p>{{MAIN_SLIDE_CHECK_SUMMARY}}</p>
+      </section>
+    </main>
+  </body>
+</html>
