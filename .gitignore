@@ -30,3 +30,7 @@ data/
 .DS_Store
 .vscode/
 .idea/
+
+# Node
+node_modules/
+tools/exec_deck_hybrid/node_modules/

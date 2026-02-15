@@ -46,6 +46,9 @@ class PDCACycleOutputs:
     feasibility_deck_path: Path | None
     markdown_report_path: Path | None
     executive_pptx_path: Path | None
+    executive_spec_path: Path | None = None
+    executive_preview_path: Path | None = None
+    executive_quality_path: Path | None = None
 
 
 def _sha256_file(path: Path) -> str | None:
@@ -244,6 +247,9 @@ def run_pdca_cycle(
 
     markdown_report_path: Path | None = None
     executive_pptx_path: Path | None = None
+    executive_spec_path: Path | None = None
+    executive_preview_path: Path | None = None
+    executive_quality_path: Path | None = None
     if policy.reporting.generate_markdown or policy.reporting.generate_executive_pptx:
         if not (policy.reporting.generate_markdown and policy.reporting.generate_executive_pptx):
             raise ValueError(
@@ -263,6 +269,13 @@ def run_pdca_cycle(
             irr_threshold=policy.feasibility.irr_threshold,
             language=policy.reporting.report_language,
             chart_language=policy.reporting.chart_language,
+            engine=policy.reporting.pptx_engine,
+            theme=policy.reporting.pptx_theme,
+            style_contract_path=Path(policy.reporting.style_contract_path),
+            spec_out_path=out_dir / f"executive_deck_spec_{run_id}.json",
+            preview_html_path=reports_dir / f"executive_pricing_deck_preview_{run_id}.html",
+            quality_out_path=out_dir / f"executive_deck_quality_{run_id}.json",
+            strict_quality=policy.reporting.strict_quality_gate,
         )
         commands.append(
             {
@@ -270,10 +283,17 @@ def run_pdca_cycle(
                 "config_path": str(active_config_path),
                 "report_language": policy.reporting.report_language,
                 "chart_language": policy.reporting.chart_language,
+                "pptx_engine": policy.reporting.pptx_engine,
+                "pptx_theme": policy.reporting.pptx_theme,
+                "style_contract_path": policy.reporting.style_contract_path,
+                "strict_quality_gate": policy.reporting.strict_quality_gate,
             }
         )
         markdown_report_path = report_outputs.markdown_path
         executive_pptx_path = report_outputs.pptx_path
+        executive_spec_path = report_outputs.spec_path
+        executive_preview_path = report_outputs.preview_html_path
+        executive_quality_path = report_outputs.quality_path
 
     manifest_path = out_dir / f"run_manifest_{run_id}.json"
     manifest = {
@@ -302,6 +322,9 @@ def run_pdca_cycle(
             "feasibility_deck_path": str(feasibility_deck_path) if feasibility_deck_path else None,
             "markdown_report_path": str(markdown_report_path) if markdown_report_path else None,
             "executive_pptx_path": str(executive_pptx_path) if executive_pptx_path else None,
+            "executive_spec_path": str(executive_spec_path) if executive_spec_path else None,
+            "executive_preview_path": str(executive_preview_path) if executive_preview_path else None,
+            "executive_quality_path": str(executive_quality_path) if executive_quality_path else None,
         },
     }
     manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=True), encoding="utf-8")
@@ -328,4 +351,7 @@ def run_pdca_cycle(
         feasibility_deck_path=feasibility_deck_path,
         markdown_report_path=markdown_report_path,
         executive_pptx_path=executive_pptx_path,
+        executive_spec_path=executive_spec_path,
+        executive_preview_path=executive_preview_path,
+        executive_quality_path=executive_quality_path,
     )

@@ -8,7 +8,7 @@ YAML設定 + CSVデータを入力にして、以下を行います。
 - IRR / NBV / 制約評価
 - loading係数の最適化
 - 実現可能性レポート生成
-- 経営層向けPPTX生成
+- 経営層向けPPTX生成（HTML/CSSプレビュー付き）
 
 ---
 
@@ -24,6 +24,7 @@ YAML設定 + CSVデータを入力にして、以下を行います。
   - 実現可能性デッキ（YAML）生成
 - `python -m pricing.cli report-executive-pptx ...`
   - `reports/feasibility_report.md` と `reports/executive_pricing_deck.pptx` を生成
+  - `html_hybrid` エンジンでは `preview.html` と `deck_spec.json` も生成
   - 既定は日本語出力（`--lang en` で英語に切替可）
   - グラフ文字は既定で英語（`--chart-lang en`）
 - `python -m pricing.cli run-cycle ...`
@@ -35,6 +36,7 @@ YAML設定 + CSVデータを入力にして、以下を行います。
 
 前提:
 - Python 3.11+
+- Node.js 20+（`html_hybrid` エンジン利用時）
 - PowerShell
 
 ### 2.1 セットアップ
@@ -43,6 +45,7 @@ YAML設定 + CSVデータを入力にして、以下を行います。
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -e .
+npm --prefix tools/exec_deck_hybrid install
 ```
 
 ### 2.2 テスト
@@ -65,14 +68,21 @@ python -m pricing.cli run configs\trial-001.yaml
 ### 2.4 経営向け成果物まで一気に
 
 ```powershell
-python -m pricing.cli report-executive-pptx configs\trial-001.executive.optimized.yaml --lang ja
+python -m pricing.cli report-executive-pptx configs\trial-001.executive.optimized.yaml `
+  --engine html_hybrid `
+  --theme consulting-clean `
+  --style-contract docs/deck_style_contract.md `
+  --lang ja --chart-lang en
 ```
 
 生成物（既定）:
 - `reports/feasibility_report.md`
 - `reports/executive_pricing_deck.pptx`
+- `reports/executive_pricing_deck_preview.html`
 - `out/run_summary_executive.json`
 - `out/feasibility_deck_executive.yaml`
+- `out/executive_deck_spec.json`
+- `out/executive_deck_quality.json`
 - `out/charts/executive/*.png`
 
 またはPDCAを一括実行:
@@ -80,6 +90,11 @@ python -m pricing.cli report-executive-pptx configs\trial-001.executive.optimize
 ```powershell
 python -m pricing.cli run-cycle configs\trial-001.yaml --policy policy/pricing_policy.yaml
 ```
+
+見た目を変える場合:
+
+- `docs/deck_style_contract.md` を編集（色・余白・フォント・9枚構成）
+- 同じコマンドを再実行すればPPTとHTMLプレビューに反映
 
 ---
 
@@ -94,6 +109,10 @@ python -m pricing.cli run-cycle configs\trial-001.yaml --policy policy/pricing_p
 |`src/pricing/diagnostics.py`|`run_summary.json` 構造化出力|
 |`src/pricing/report_feasibility.py`|実現可能性YAMLデッキ生成|
 |`src/pricing/report_executive_pptx.py`|Markdown + PPTXの生成|
+|`src/pricing/reporting/*`|style/spec/qualityの補助モジュール|
+|`docs/deck_style_contract.md`|デッキ見た目の唯一定義源（編集用）|
+|`tools/exec_deck_hybrid/*`|HTMLプレビュー + PPTXレンダラ（Node）|
+|`skills/exec-deck-hybrid/*`|実行手順をまとめたSkill|
 |`docs/script_relationships.md`|スクリプト間の関係メモ（入口->計算->出力）|
 |`configs/*.yaml`|実験設定|
 |`data/*.csv`|入力データ|
@@ -139,7 +158,10 @@ python -m pricing.cli sweep-ptm configs\trial-001.yaml --all-model-points --star
 ### Step 5: 最終レポートを作る
 
 ```powershell
-python -m pricing.cli report-executive-pptx configs\trial-001.executive.optimized.yaml --lang ja
+python -m pricing.cli report-executive-pptx configs\trial-001.executive.optimized.yaml `
+  --engine html_hybrid `
+  --style-contract docs/deck_style_contract.md `
+  --lang ja --chart-lang en
 ```
 
 ---
@@ -192,6 +214,13 @@ python -m pricing.cli report-executive-pptx <config.yaml> `
   --run-summary-out out/run_summary_executive.json `
   --deck-out out/feasibility_deck_executive.yaml `
   --chart-dir out/charts/executive `
+  --engine html_hybrid `
+  --theme consulting-clean `
+  --style-contract docs/deck_style_contract.md `
+  --spec-out out/executive_deck_spec.json `
+  --preview-html-out reports/executive_pricing_deck_preview.html `
+  --quality-out out/executive_deck_quality.json `
+  --strict-quality `
   --lang ja `
   --chart-lang en
 ```
@@ -296,6 +325,9 @@ python -m pricing.cli run-cycle <config.yaml> --policy policy/pricing_policy.yam
 |`out/feasibility_deck*.yaml`|掃引結果と制約状況のデータデッキ|
 |`reports/feasibility_report.md`|説明責任向け本文（式・係数・中間計算）|
 |`reports/executive_pricing_deck.pptx`|経営層向けスライド|
+|`reports/executive_pricing_deck_preview.html`|HTML/CSSプレビュー（見た目確認用）|
+|`out/executive_deck_spec.json`|PPT生成の中間仕様（trace_mapを含む）|
+|`out/executive_deck_quality.json`|品質ゲート結果（trace/editability/runtime）|
 
 ---
 
@@ -303,6 +335,10 @@ python -m pricing.cli run-cycle <config.yaml> --policy policy/pricing_policy.yam
 
 ### Q1. `ModuleNotFoundError` が出る
 - 仮想環境を有効化して `pip install -e .` を再実行
+
+### Q1-2. `html_hybrid` で Node 関連エラーが出る
+- `npm --prefix tools/exec_deck_hybrid install` を実行
+- `node -v` でNodeがPATHにあるか確認
 
 ### Q2. CSVが見つからない
 - `configs/*.yaml` の相対パスが正しいか確認

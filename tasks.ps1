@@ -38,7 +38,7 @@ switch ($Task) {
         break
     }
     "executive" {
-        python -m pricing.cli report-executive-pptx $Config --r-start $Start --r-end $End --r-step $Step --irr-threshold $IrrThreshold --lang ja --chart-lang en
+        python -m pricing.cli report-executive-pptx $Config --r-start $Start --r-end $End --r-step $Step --irr-threshold $IrrThreshold --lang ja --chart-lang en --engine html_hybrid --theme consulting-clean --style-contract docs/deck_style_contract.md --strict-quality
         break
     }
     "cycle" {

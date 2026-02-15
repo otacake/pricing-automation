@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -23,6 +24,12 @@ def _run_cli(args: list[str]) -> subprocess.CompletedProcess[str]:
         check=False,
         env=env,
     )
+
+
+def _html_hybrid_ready() -> bool:
+    if shutil.which("node") is None:
+        return False
+    return (REPO_ROOT / "tools" / "exec_deck_hybrid" / "node_modules" / "pptxgenjs").exists()
 
 
 def test_cli_report_feasibility_writes_output(tmp_path: Path) -> None:
@@ -84,6 +91,8 @@ def test_cli_report_executive_pptx_writes_outputs(tmp_path: Path) -> None:
             "ja",
             "--chart-lang",
             "en",
+            "--engine",
+            "legacy",
         ]
     )
 
@@ -94,3 +103,64 @@ def test_cli_report_executive_pptx_writes_outputs(tmp_path: Path) -> None:
     assert feasibility_path.exists()
     assert (chart_dir / "cashflow_by_profit_source.png").exists()
     assert (chart_dir / "annual_premium_by_model_point.png").exists()
+
+
+def test_cli_report_executive_pptx_html_hybrid_writes_outputs(tmp_path: Path) -> None:
+    pytest.importorskip("matplotlib")
+    if not _html_hybrid_ready():
+        pytest.skip("html_hybrid dependencies are not installed.")
+
+    deck_path = tmp_path / "executive_hybrid.pptx"
+    md_path = tmp_path / "feasibility_hybrid.md"
+    run_summary_path = tmp_path / "run_summary_hybrid.json"
+    feasibility_path = tmp_path / "feasibility_hybrid.yaml"
+    chart_dir = tmp_path / "charts_hybrid"
+    spec_path = tmp_path / "spec_hybrid.json"
+    preview_path = tmp_path / "preview_hybrid.html"
+    quality_path = tmp_path / "quality_hybrid.json"
+
+    completed = _run_cli(
+        [
+            "report-executive-pptx",
+            "configs/trial-001.executive.optimized.yaml",
+            "--out",
+            str(deck_path),
+            "--md-out",
+            str(md_path),
+            "--run-summary-out",
+            str(run_summary_path),
+            "--deck-out",
+            str(feasibility_path),
+            "--chart-dir",
+            str(chart_dir),
+            "--spec-out",
+            str(spec_path),
+            "--preview-html-out",
+            str(preview_path),
+            "--quality-out",
+            str(quality_path),
+            "--r-start",
+            "1.0",
+            "--r-end",
+            "1.0",
+            "--r-step",
+            "0.01",
+            "--irr-threshold",
+            "0.0",
+            "--lang",
+            "ja",
+            "--chart-lang",
+            "en",
+            "--engine",
+            "html_hybrid",
+        ]
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert deck_path.exists()
+    assert md_path.exists()
+    assert run_summary_path.exists()
+    assert feasibility_path.exists()
+    assert spec_path.exists()
+    assert preview_path.exists()
+    assert quality_path.exists()

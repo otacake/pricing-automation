@@ -25,6 +25,10 @@ def test_load_auto_cycle_policy_defaults(tmp_path: Path) -> None:
     assert policy.feasibility.enabled is True
     assert policy.reporting.report_language == "ja"
     assert policy.reporting.chart_language == "en"
+    assert policy.reporting.pptx_engine == "html_hybrid"
+    assert policy.reporting.pptx_theme == "consulting-clean"
+    assert policy.reporting.style_contract_path == "docs/deck_style_contract.md"
+    assert policy.reporting.strict_quality_gate is True
 
 
 def test_repo_policy_file_is_loadable() -> None:
@@ -32,3 +36,5 @@ def test_repo_policy_file_is_loadable() -> None:
     policy = load_auto_cycle_policy(policy_path)
     assert policy.reporting.report_language in ("ja", "en")
     assert policy.reporting.chart_language in ("ja", "en")
+    assert policy.reporting.pptx_engine in ("html_hybrid", "legacy")
+    assert policy.reporting.pptx_theme == "consulting-clean"

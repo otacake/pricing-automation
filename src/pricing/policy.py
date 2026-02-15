@@ -31,6 +31,10 @@ class ReportPolicy:
     generate_executive_pptx: bool
     report_language: str
     chart_language: str
+    pptx_engine: str
+    pptx_theme: str
+    style_contract_path: str
+    strict_quality_gate: bool
 
 
 @dataclass(frozen=True)
@@ -62,6 +66,20 @@ def load_auto_cycle_policy(path: Path) -> AutoCyclePolicy:
     if chart_language not in ("ja", "en"):
         raise ValueError("chart_language must be 'ja' or 'en'.")
 
+    pptx_engine = str(reporting_cfg.get("pptx_engine", "html_hybrid")).strip().lower()
+    if pptx_engine not in ("html_hybrid", "legacy"):
+        raise ValueError("pptx_engine must be 'html_hybrid' or 'legacy'.")
+
+    pptx_theme = str(reporting_cfg.get("pptx_theme", "consulting-clean")).strip().lower()
+    if pptx_theme != "consulting-clean":
+        raise ValueError("pptx_theme must be 'consulting-clean'.")
+
+    style_contract_path = str(
+        reporting_cfg.get("style_contract_path", "docs/deck_style_contract.md")
+    ).strip()
+    if not style_contract_path:
+        raise ValueError("style_contract_path must not be empty.")
+
     return AutoCyclePolicy(
         gate=GatePolicy(
             max_violation_count=int(gate_cfg.get("max_violation_count", 0)),
@@ -78,5 +96,9 @@ def load_auto_cycle_policy(path: Path) -> AutoCyclePolicy:
             generate_executive_pptx=bool(reporting_cfg.get("generate_executive_pptx", True)),
             report_language=report_language,
             chart_language=chart_language,
+            pptx_engine=pptx_engine,
+            pptx_theme=pptx_theme,
+            style_contract_path=style_contract_path,
+            strict_quality_gate=bool(reporting_cfg.get("strict_quality_gate", True)),
         ),
     )

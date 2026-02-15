@@ -10,6 +10,9 @@ from pathlib import Path
 import copy
 import json
 import os
+import shutil
+import subprocess
+import time
 from typing import Any, Mapping
 
 import pandas as pd
@@ -20,6 +23,7 @@ from .diagnostics import build_execution_context, build_run_summary
 from .endowment import LoadingFunctionParams, calc_loading_parameters
 from .paths import resolve_base_dir_from_config
 from .profit_test import DEFAULT_LAPSE_RATE, DEFAULT_VALUATION_INTEREST, run_profit_test
+from .reporting import build_executive_deck_spec, evaluate_quality_gate, load_style_contract
 from .report_feasibility import build_feasibility_report
 
 
@@ -41,6 +45,9 @@ class ExecutiveReportOutputs:
     feasibility_deck_path: Path
     cashflow_chart_path: Path
     premium_chart_path: Path
+    spec_path: Path | None = None
+    preview_html_path: Path | None = None
+    quality_path: Path | None = None
 
 
 def _resolve_output_path(base_dir: Path, path: Path | None, default: str) -> Path:
@@ -50,6 +57,8 @@ def _resolve_output_path(base_dir: Path, path: Path | None, default: str) -> Pat
 
 def _require_matplotlib():
     try:
+        import matplotlib
+        matplotlib.use("Agg")
         import matplotlib.pyplot as plt
     except ModuleNotFoundError as exc:  # pragma: no cover - depends on runtime env
         raise RuntimeError(
@@ -108,6 +117,48 @@ def _validate_language(language: str) -> str:
     if lang not in {"ja", "en"}:
         raise ValueError(f"Unsupported language: {language}. Use 'ja' or 'en'.")
     return lang
+
+
+def _validate_engine(engine: str) -> str:
+    normalized = str(engine).strip().lower()
+    if normalized not in {"html_hybrid", "legacy"}:
+        raise ValueError(f"Unsupported engine: {engine}. Use 'html_hybrid' or 'legacy'.")
+    return normalized
+
+
+def _validate_theme(theme: str) -> str:
+    normalized = str(theme).strip().lower()
+    if normalized != "consulting-clean":
+        raise ValueError(f"Unsupported theme: {theme}. Use 'consulting-clean'.")
+    return normalized
+
+
+def _require_node_runtime() -> str:
+    node = shutil.which("node")
+    if node is None:
+        raise RuntimeError("Node.js is required for html_hybrid engine but was not found in PATH.")
+    return node
+
+
+def _run_node_command(
+    *,
+    base_dir: Path,
+    command: list[str],
+    failure_hint: str,
+) -> None:
+    completed = subprocess.run(
+        command,
+        cwd=base_dir,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if completed.returncode != 0:
+        stdout_tail = completed.stdout[-2000:]
+        stderr_tail = completed.stderr[-2000:]
+        raise RuntimeError(
+            f"{failure_hint}\ncommand: {' '.join(command)}\nstdout_tail:\n{stdout_tail}\nstderr_tail:\n{stderr_tail}"
+        )
 
 
 def _scenario_label(name: str, language: str) -> str:
@@ -811,6 +862,117 @@ def _write_executive_pptx(
     return out_path
 
 
+def _write_executive_pptx_html_hybrid(
+    *,
+    base_dir: Path,
+    out_path: Path,
+    spec_output: Path,
+    preview_output: Path,
+    quality_output: Path,
+    style_contract_path: Path,
+    theme: str,
+    strict_quality: bool,
+    run_summary: Mapping[str, Any],
+    summary_df: pd.DataFrame,
+    agg_cashflow: pd.DataFrame,
+    constraint_rows: list[dict[str, object]],
+    sensitivity_rows: list[dict[str, object]],
+    config_path: Path,
+    language: str,
+    chart_language: str,
+) -> tuple[Path, Path, Path]:
+    node = _require_node_runtime()
+    theme_name = _validate_theme(theme)
+    contract = load_style_contract(style_contract_path)
+    spec = build_executive_deck_spec(
+        config_path=config_path,
+        run_summary=run_summary,
+        summary_df=summary_df,
+        cashflow_df=agg_cashflow,
+        constraint_rows=constraint_rows,
+        sensitivity_rows=sensitivity_rows,
+        style_contract=contract,
+        language=language,
+        chart_language=chart_language,
+        theme=theme_name,
+    )
+
+    spec_output.parent.mkdir(parents=True, exist_ok=True)
+    spec_output.write_text(json.dumps(spec, indent=2, ensure_ascii=True), encoding="utf-8")
+
+    tool_dir = base_dir / "tools" / "exec_deck_hybrid"
+    preview_script = tool_dir / "src" / "render_preview.mjs"
+    pptx_script = tool_dir / "src" / "render_pptx.mjs"
+    template_path = tool_dir / "templates" / theme_name / "deck.html"
+    css_path = tool_dir / "templates" / theme_name / "theme.css"
+
+    required_paths = [preview_script, pptx_script, template_path, css_path]
+    missing = [path for path in required_paths if not path.is_file()]
+    if missing:
+        joined = ", ".join(path.as_posix() for path in missing)
+        raise RuntimeError(f"html_hybrid renderer files are missing: {joined}")
+
+    if not (tool_dir / "node_modules" / "pptxgenjs").exists():
+        raise RuntimeError(
+            "html_hybrid engine requires Node dependencies. "
+            f"Run: npm --prefix {tool_dir.as_posix()} install"
+        )
+
+    preview_output.parent.mkdir(parents=True, exist_ok=True)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    quality_output.parent.mkdir(parents=True, exist_ok=True)
+
+    render_metrics_path = quality_output.with_name(f"{quality_output.stem}.render_metrics.json")
+    start = time.perf_counter()
+    _run_node_command(
+        base_dir=base_dir,
+        command=[
+            node,
+            str(preview_script),
+            "--spec",
+            str(spec_output),
+            "--template",
+            str(template_path),
+            "--css",
+            str(css_path),
+            "--out",
+            str(preview_output),
+        ],
+        failure_hint="Failed to render HTML preview for executive deck.",
+    )
+    _run_node_command(
+        base_dir=base_dir,
+        command=[
+            node,
+            str(pptx_script),
+            "--spec",
+            str(spec_output),
+            "--out",
+            str(out_path),
+            "--metrics-out",
+            str(render_metrics_path),
+        ],
+        failure_hint="Failed to render PPTX with html_hybrid engine.",
+    )
+    runtime_seconds = time.perf_counter() - start
+
+    render_metrics: dict[str, Any] = {}
+    if render_metrics_path.is_file():
+        render_metrics = json.loads(render_metrics_path.read_text(encoding="utf-8"))
+    quality = evaluate_quality_gate(
+        spec=spec,
+        render_metrics=render_metrics,
+        runtime_seconds=runtime_seconds,
+    )
+    quality_output.write_text(json.dumps(quality.to_dict(), indent=2, ensure_ascii=True), encoding="utf-8")
+    if strict_quality and not quality.passed:
+        raise RuntimeError(
+            "html_hybrid quality gate failed. "
+            f"See details at: {quality_output.as_posix()}"
+        )
+    return spec_output, preview_output, quality_output
+
+
 def report_executive_pptx_from_config(
     config_path: Path,
     *,
@@ -826,9 +988,18 @@ def report_executive_pptx_from_config(
     include_sensitivity: bool = True,
     language: str = "ja",
     chart_language: str = "en",
+    engine: str = "html_hybrid",
+    theme: str = "consulting-clean",
+    style_contract_path: Path | None = None,
+    spec_out_path: Path | None = None,
+    preview_html_path: Path | None = None,
+    quality_out_path: Path | None = None,
+    strict_quality: bool = True,
 ) -> ExecutiveReportOutputs:
     language = _validate_language(language)
     chart_language = _validate_language(chart_language)
+    engine = _validate_engine(engine)
+    theme = _validate_theme(theme)
     config_path = config_path.expanduser().resolve()
     config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
     base_dir = resolve_base_dir_from_config(config_path)
@@ -839,7 +1010,17 @@ def report_executive_pptx_from_config(
         base_dir=base_dir,
         config_path=config_path,
         command="pricing.cli report-executive-pptx",
-        argv=[str(config_path)],
+        argv=[
+            str(config_path),
+            "--engine",
+            engine,
+            "--theme",
+            theme,
+            "--lang",
+            language,
+            "--chart-lang",
+            chart_language,
+        ],
     )
     run_summary = build_run_summary(
         config,
@@ -914,17 +1095,60 @@ def report_executive_pptx_from_config(
 
     pptx_output = _resolve_output_path(base_dir, out_path, "reports/executive_pricing_deck.pptx")
     constraint_rows = _constraint_status_rows(run_summary)
-    _write_executive_pptx(
-        out_path=pptx_output,
-        run_summary=run_summary,
-        summary_df=result.summary.sort_values("model_point"),
-        constraint_rows=constraint_rows,
-        sensitivity_rows=sensitivity_rows,
-        cashflow_chart_path=cashflow_chart,
-        premium_chart_path=premium_chart,
-        config_path=config_path,
-        language=language,
-    )
+    spec_output: Path | None = None
+    preview_output: Path | None = None
+    quality_output: Path | None = None
+    if engine == "legacy":
+        _write_executive_pptx(
+            out_path=pptx_output,
+            run_summary=run_summary,
+            summary_df=result.summary.sort_values("model_point"),
+            constraint_rows=constraint_rows,
+            sensitivity_rows=sensitivity_rows,
+            cashflow_chart_path=cashflow_chart,
+            premium_chart_path=premium_chart,
+            config_path=config_path,
+            language=language,
+        )
+    else:
+        contract_path = _resolve_output_path(
+            base_dir,
+            style_contract_path,
+            "docs/deck_style_contract.md",
+        )
+        spec_output = _resolve_output_path(
+            base_dir,
+            spec_out_path,
+            "out/executive_deck_spec.json",
+        )
+        preview_output = _resolve_output_path(
+            base_dir,
+            preview_html_path,
+            "reports/executive_pricing_deck_preview.html",
+        )
+        quality_output = _resolve_output_path(
+            base_dir,
+            quality_out_path,
+            "out/executive_deck_quality.json",
+        )
+        _write_executive_pptx_html_hybrid(
+            base_dir=base_dir,
+            out_path=pptx_output,
+            spec_output=spec_output,
+            preview_output=preview_output,
+            quality_output=quality_output,
+            style_contract_path=contract_path,
+            theme=theme,
+            strict_quality=bool(strict_quality),
+            run_summary=run_summary,
+            summary_df=result.summary.sort_values("model_point"),
+            agg_cashflow=agg_cashflow,
+            constraint_rows=constraint_rows,
+            sensitivity_rows=sensitivity_rows,
+            config_path=config_path,
+            language=language,
+            chart_language=chart_language,
+        )
 
     return ExecutiveReportOutputs(
         pptx_path=pptx_output,
@@ -933,4 +1157,7 @@ def report_executive_pptx_from_config(
         feasibility_deck_path=deck_output,
         cashflow_chart_path=cashflow_chart,
         premium_chart_path=premium_chart,
+        spec_path=spec_output,
+        preview_html_path=preview_output,
+        quality_path=quality_output,
     )

@@ -1,0 +1,102 @@
+:root {
+  --color-primary: {{COLOR_PRIMARY}};
+  --color-secondary: {{COLOR_SECONDARY}};
+  --color-accent: {{COLOR_ACCENT}};
+  --color-positive: {{COLOR_POSITIVE}};
+  --color-negative: {{COLOR_NEGATIVE}};
+  --color-background: {{COLOR_BACKGROUND}};
+  --color-text: {{COLOR_TEXT}};
+  --color-grid: {{COLOR_GRID}};
+  --font-ja: "{{FONT_JA}}", "{{FONT_JA_FALLBACK}}", sans-serif;
+  --font-en: "{{FONT_EN}}", "{{FONT_EN_FALLBACK}}", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 24px;
+  background: linear-gradient(160deg, #f9fbff 0%, #eef3f8 100%);
+  color: var(--color-text);
+  font-family: var(--font-ja);
+}
+
+.deck {
+  display: grid;
+  gap: 16px;
+}
+
+.slide {
+  border: 1px solid var(--color-grid);
+  border-radius: 10px;
+  padding: 20px;
+  background: #ffffff;
+  box-shadow: 0 6px 24px rgba(17, 24, 39, 0.06);
+}
+
+.slide-header {
+  border-left: 5px solid var(--color-primary);
+  padding-left: 10px;
+  margin-bottom: 14px;
+}
+
+.slide h1,
+.slide h2 {
+  margin: 0;
+  font-family: var(--font-en);
+  color: var(--color-primary);
+}
+
+.headline {
+  font-size: 1.15rem;
+  margin: 8px 0 16px;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.card {
+  border: 1px solid var(--color-grid);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--color-background);
+}
+
+.card .label {
+  display: block;
+  color: var(--color-secondary);
+  font-size: 0.8rem;
+}
+
+.card .value {
+  display: block;
+  margin-top: 5px;
+  font-family: var(--font-en);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  border: 1px solid var(--color-grid);
+  padding: 7px 8px;
+  text-align: left;
+  font-size: 0.85rem;
+}
+
+th {
+  background: rgba(11, 95, 165, 0.08);
+  color: var(--color-primary);
+  font-family: var(--font-en);
+}

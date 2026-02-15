@@ -478,6 +478,49 @@ def main(argv: list[str] | None = None) -> int:  # CLIのメイン処理を実�
         default="en",
         help="Language for chart text. Default is English to avoid font issues.",
     )
+    executive_parser.add_argument(
+        "--engine",
+        type=str,
+        choices=("html_hybrid", "legacy"),
+        default="html_hybrid",
+        help="PPT generation engine. html_hybrid requires Node dependencies.",
+    )
+    executive_parser.add_argument(
+        "--theme",
+        type=str,
+        default="consulting-clean",
+        help="Theme name for html_hybrid engine.",
+    )
+    executive_parser.add_argument(
+        "--style-contract",
+        type=str,
+        default="docs/deck_style_contract.md",
+        help="Path to markdown style contract used by html_hybrid engine.",
+    )
+    executive_parser.add_argument(
+        "--spec-out",
+        type=str,
+        default="out/executive_deck_spec.json",
+        help="Output JSON path for deck spec.",
+    )
+    executive_parser.add_argument(
+        "--preview-html-out",
+        type=str,
+        default="reports/executive_pricing_deck_preview.html",
+        help="Output HTML preview path for html_hybrid engine.",
+    )
+    executive_parser.add_argument(
+        "--quality-out",
+        type=str,
+        default="out/executive_deck_quality.json",
+        help="Output JSON path for quality gate report.",
+    )
+    executive_parser.add_argument(
+        "--strict-quality",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Fail when quality gate is not satisfied (default: true).",
+    )
 
     cycle_parser = subparsers.add_parser(
         "run-cycle",
@@ -558,6 +601,13 @@ def main(argv: list[str] | None = None) -> int:  # CLIのメイン処理を実�
             irr_threshold=float(args.irr_threshold),
             language=str(args.lang),
             chart_language=str(args.chart_lang),
+            engine=str(args.engine),
+            theme=str(args.theme),
+            style_contract_path=Path(args.style_contract),
+            spec_out_path=Path(args.spec_out),
+            preview_html_path=Path(args.preview_html_out),
+            quality_out_path=Path(args.quality_out),
+            strict_quality=bool(args.strict_quality),
         )
         print(f"wrote_pptx: {outputs.pptx_path}")
         print(f"wrote_markdown: {outputs.markdown_path}")
@@ -565,6 +615,12 @@ def main(argv: list[str] | None = None) -> int:  # CLIのメイン処理を実�
         print(f"wrote_feasibility_deck: {outputs.feasibility_deck_path}")
         print(f"wrote_cashflow_chart: {outputs.cashflow_chart_path}")
         print(f"wrote_premium_chart: {outputs.premium_chart_path}")
+        if outputs.spec_path is not None:
+            print(f"wrote_spec: {outputs.spec_path}")
+        if outputs.preview_html_path is not None:
+            print(f"wrote_preview_html: {outputs.preview_html_path}")
+        if outputs.quality_path is not None:
+            print(f"wrote_quality: {outputs.quality_path}")
         return 0
     if args.command == "run-cycle":
         outputs = run_pdca_cycle(
@@ -586,6 +642,12 @@ def main(argv: list[str] | None = None) -> int:  # CLIのメイン処理を実�
             print(f"wrote_markdown: {outputs.markdown_report_path}")
         if outputs.executive_pptx_path is not None:
             print(f"wrote_pptx: {outputs.executive_pptx_path}")
+        if outputs.executive_spec_path is not None:
+            print(f"wrote_spec: {outputs.executive_spec_path}")
+        if outputs.executive_preview_path is not None:
+            print(f"wrote_preview_html: {outputs.executive_preview_path}")
+        if outputs.executive_quality_path is not None:
+            print(f"wrote_quality: {outputs.executive_quality_path}")
         return 0
     if args.command == "propose-change":
         if not args.set_values:

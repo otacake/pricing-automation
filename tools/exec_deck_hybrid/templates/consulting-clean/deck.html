@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Executive Pricing Deck Preview</title>
+    <style>
+{{THEME_CSS}}
+    </style>
+  </head>
+  <body>
+    <main class="deck">
+      <section class="slide">
+        <header class="slide-header">
+          <h1>Executive Summary</h1>
+        </header>
+        <p class="headline">{{HEADLINE}}</p>
+        <div class="cards">
+{{SUMMARY_CARDS}}
+        </div>
+      </section>
+
+      <section class="slide">
+        <header class="slide-header">
+          <h2>Pricing Recommendation</h2>
+        </header>
+        <table>
+          <thead>
+            <tr>
+              <th>Model Point</th>
+              <th>Annual P</th>
+              <th>Monthly P</th>
+              <th>IRR</th>
+              <th>NBV</th>
+              <th>PTM</th>
+            </tr>
+          </thead>
+          <tbody>
+{{PRICING_ROWS}}
+          </tbody>
+        </table>
+      </section>
+
+      <section class="slide">
+        <header class="slide-header">
+          <h2>Constraint Status</h2>
+        </header>
+        <table>
+          <thead>
+            <tr>
+              <th>Constraint</th>
+              <th>Threshold</th>
+              <th>Min Gap</th>
+              <th>Worst Model Point</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+{{CONSTRAINT_ROWS}}
+          </tbody>
+        </table>
+      </section>
+
+      <section class="slide">
+        <header class="slide-header">
+          <h2>Sensitivity and Risks</h2>
+        </header>
+        <table>
+          <thead>
+            <tr>
+              <th>Scenario</th>
+              <th>Min IRR</th>
+              <th>Min NBV</th>
+              <th>Max PTM</th>
+              <th>Violations</th>
+            </tr>
+          </thead>
+          <tbody>
+{{SENSITIVITY_ROWS}}
+          </tbody>
+        </table>
+      </section>
+    </main>
+  </body>
+</html>

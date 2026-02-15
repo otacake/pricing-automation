@@ -1,0 +1,13 @@
+{
+  "name": "exec-deck-hybrid",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "render:pptx": "node src/render_pptx.mjs",
+    "render:preview": "node src/render_preview.mjs"
+  },
+  "dependencies": {
+    "pptxgenjs": "^3.12.0"
+  }
+}

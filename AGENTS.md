@@ -32,6 +32,8 @@ Set prices that satisfy adequacy, profitability, and soundness at the same time,
 - Use timestamped output names for manual runs (for example: `*_YYYYMMDD_HHMMSS.*`).
 - Treat negative planned expense assumptions as errors and stop immediately.
 - Record watch/exempt rationale in `reports/pdca_log.md`.
+- Use `report-executive-pptx --engine html_hybrid` as default unless legacy compatibility is explicitly required.
+- Keep `docs/deck_style_contract.md` as the single source of deck style.
 
 ## 4. Hard Gates (Stage Exit Criteria)
 - Gate A: Data quality checks passed.
@@ -59,6 +61,9 @@ Set prices that satisfy adequacy, profitability, and soundness at the same time,
 - `out/result_<timestamp>.log`
 - `reports/feasibility_report_<timestamp>.md`
 - `reports/executive_pricing_deck_<timestamp>.pptx`
+- `reports/executive_pricing_deck_preview_<timestamp>.html`
+- `out/executive_deck_spec_<timestamp>.json`
+- `out/executive_deck_quality_<timestamp>.json`
 - `reports/pdca_log.md` (append-only)
 - `out/run_manifest_<timestamp>.json` (commands, hashes, versions, environment)
 
@@ -91,12 +96,17 @@ Set prices that satisfy adequacy, profitability, and soundness at the same time,
 
 ### Executive PPTX (`reports/*.pptx`)
 - Executive Summary
+- Decision Statement
 - Pricing Recommendation
 - Constraint Status
 - Cashflow by Profit Source
+- Profit Source Decomposition
 - Sensitivity and Risks
+- Governance and Explainability
 - Decision Ask / Next Actions
 - One message per slide; every quantitative claim must be traceable.
+- Preferred engine: `html_hybrid` (editable PPT-native objects).
+- Must satisfy quality gate: `numeric_trace_coverage >= 1.0`, `editable_shape_ratio >= 0.80`, `runtime_seconds <= 180`.
 
 ## 10. Data Quality Gate (Minimum Checks)
 - Required CSV columns exist.
