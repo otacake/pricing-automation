@@ -32,7 +32,9 @@ Set prices that satisfy adequacy, profitability, and soundness at the same time,
 - Use timestamped output names for manual runs (for example: `*_YYYYMMDD_HHMMSS.*`).
 - Treat negative planned expense assumptions as errors and stop immediately.
 - Record watch/exempt rationale in `reports/pdca_log.md`.
-- Use `report-executive-pptx --engine html_hybrid` as default unless legacy compatibility is explicitly required.
+- Use `report-executive-pptx` with the fixed PptxGenJS backend (no engine switch).
+- Use `report-executive-pptx --decision-compare on --counter-objective maximize_min_irr` as default.
+- Keep explainability strict gate enabled (`--explainability-strict` / policy `reporting.explainability.strict_gate: true`).
 - Keep `docs/deck_style_contract.md` as the single source of deck style.
 
 ## 4. Hard Gates (Stage Exit Criteria)
@@ -64,6 +66,8 @@ Set prices that satisfy adequacy, profitability, and soundness at the same time,
 - `reports/executive_pricing_deck_preview_<timestamp>.html`
 - `out/executive_deck_spec_<timestamp>.json`
 - `out/executive_deck_quality_<timestamp>.json`
+- `out/explainability_report_<timestamp>.json`
+- `out/decision_compare_<timestamp>.json`
 - `reports/pdca_log.md` (append-only)
 - `out/run_manifest_<timestamp>.json` (commands, hashes, versions, environment)
 
@@ -105,8 +109,21 @@ Set prices that satisfy adequacy, profitability, and soundness at the same time,
 - Governance and Explainability
 - Decision Ask / Next Actions
 - One message per slide; every quantitative claim must be traceable.
-- Preferred engine: `html_hybrid` (editable PPT-native objects).
-- Must satisfy quality gate: `numeric_trace_coverage >= 1.0`, `editable_shape_ratio >= 0.80`, `runtime_seconds <= 180`.
+- Main-body slides must follow `conclusion -> rationale -> risk -> decision_ask` with at least 6 lines per slide.
+- `Decision Statement` is dedicated to recommended vs counter comparison in the main body.
+- Preferred PPT backend: `PptxGenJS` (editable PPT-native objects).
+- Must satisfy quality gate:
+  - `numeric_trace_coverage >= 1.0`
+  - `editable_shape_ratio >= 0.80`
+  - `runtime_seconds <= 180`
+  - `causal_chain_coverage == 1.0`
+  - `procon_cardinality_ok == true`
+  - `dual_alternative_integrity == true` (when compare is enabled)
+  - `bridge_and_sensitivity_present == true`
+  - `main_compare_present == true` (when compare is enabled)
+  - `main_narrative_coverage == 1.0`
+  - `main_narrative_density_ok == true`
+  - `decision_style_ok == true`
 
 ## 10. Data Quality Gate (Minimum Checks)
 - Required CSV columns exist.

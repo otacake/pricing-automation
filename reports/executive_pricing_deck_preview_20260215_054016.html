@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Executive Pricing Deck Preview</title>
+    <style>
+:root {
+  --color-primary: #0B5FA5;
+  --color-secondary: #5B6B7A;
+  --color-accent: #F59E0B;
+  --color-positive: #2A9D8F;
+  --color-negative: #D1495B;
+  --color-background: #F8FAFC;
+  --color-text: #111827;
+  --color-grid: #D1D5DB;
+  --font-ja: "Meiryo UI", "Meiryo", sans-serif;
+  --font-en: "Calibri", "Arial", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 24px;
+  background: linear-gradient(160deg, #f9fbff 0%, #eef3f8 100%);
+  color: var(--color-text);
+  font-family: var(--font-ja);
+}
+
+.deck {
+  display: grid;
+  gap: 16px;
+}
+
+.slide {
+  border: 1px solid var(--color-grid);
+  border-radius: 10px;
+  padding: 20px;
+  background: #ffffff;
+  box-shadow: 0 6px 24px rgba(17, 24, 39, 0.06);
+}
+
+.slide-header {
+  border-left: 5px solid var(--color-primary);
+  padding-left: 10px;
+  margin-bottom: 14px;
+}
+
+.slide h1,
+.slide h2 {
+  margin: 0;
+  font-family: var(--font-en);
+  color: var(--color-primary);
+}
+
+.headline {
+  font-size: 1.15rem;
+  margin: 8px 0 16px;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.card {
+  border: 1px solid var(--color-grid);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--color-background);
+}
+
+.card .label {
+  display: block;
+  color: var(--color-secondary);
+  font-size: 0.8rem;
+}
+
+.card .value {
+  display: block;
+  margin-top: 5px;
+  font-family: var(--font-en);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  border: 1px solid var(--color-grid);
+  padding: 7px 8px;
+  text-align: left;
+  font-size: 0.85rem;
+}
+
+th {
+  background: rgba(11, 95, 165, 0.08);
+  color: var(--color-primary);
+  font-family: var(--font-en);
+}
+
+    </style>
+  </head>
+  <body>
+    <main class="deck">
+      <section class="slide">
+        <header class="slide-header">
+          <h1>Executive Summary</h1>
+        </header>
+        <p class="headline">十分性・収益性・健全性を同時充足する価格提案</p>
+        <div class="cards">
+<article class="card"><span class="label">最小IRR</span><span class="value">6.88%</span></article>
+<article class="card"><span class="label">最小NBV</span><span class="value">JPY 78,837</span></article>
+<article class="card"><span class="label">最大PTM</span><span class="value">1.0699</span></article>
+<article class="card"><span class="label">違反件数</span><span class="value">0</span></article>
+        </div>
+      </section>
+
+      <section class="slide">
+        <header class="slide-header">
+          <h2>Pricing Recommendation</h2>
+        </header>
+        <table>
+          <thead>
+            <tr>
+              <th>Model Point</th>
+              <th>Annual P</th>
+              <th>Monthly P</th>
+              <th>IRR</th>
+              <th>NBV</th>
+              <th>PTM</th>
+            </tr>
+          </thead>
+          <tbody>
+<tr><td>female_age30_term35</td><td>88,332</td><td>7,361</td><td>6.89%</td><td>178,699</td><td>1.0305</td></tr>
+<tr><td>female_age40_term25</td><td>124,308</td><td>10,359</td><td>8.87%</td><td>254,818</td><td>1.0359</td></tr>
+<tr><td>female_age50_term20</td><td>157,074</td><td>13,089.5</td><td>9.72%</td><td>238,794</td><td>1.0472</td></tr>
+<tr><td>female_age60_term10</td><td>313,129</td><td>26,094.1</td><td>8.14%</td><td>78,837</td><td>1.0438</td></tr>
+<tr><td>male_age30_term35</td><td>89,312</td><td>7,442.7</td><td>6.88%</td><td>176,337</td><td>1.0420</td></tr>
+<tr><td>male_age40_term25</td><td>125,806</td><td>10,483.8</td><td>8.79%</td><td>247,423</td><td>1.0484</td></tr>
+<tr><td>male_age50_term20</td><td>160,492</td><td>13,374.3</td><td>9.35%</td><td>220,328</td><td>1.0699</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="slide">
+        <header class="slide-header">
+          <h2>Constraint Status</h2>
+        </header>
+        <table>
+          <thead>
+            <tr>
+              <th>Constraint</th>
+              <th>Threshold</th>
+              <th>Min Gap</th>
+              <th>Worst Model Point</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+<tr><td>alpha_non_negative</td><td>0</td><td>0.0055</td><td>female_age30_term35</td><td>OK</td></tr>
+<tr><td>beta_non_negative</td><td>0</td><td>0.004</td><td>male_age30_term35</td><td>OK</td></tr>
+<tr><td>gamma_non_negative</td><td>0</td><td>0.03</td><td>male_age30_term35</td><td>OK</td></tr>
+<tr><td>IRR下限</td><td>0</td><td>0.06876</td><td>male_age30_term35</td><td>OK</td></tr>
+<tr><td>loading_positive</td><td>0</td><td>15,215</td><td>female_age30_term35</td><td>OK</td></tr>
+<tr><td>Loading surplus下限</td><td>-300,000</td><td>97,579.972666</td><td>female_age30_term35</td><td>OK</td></tr>
+<tr><td>Loading surplus比率下限</td><td>-0.1</td><td>0.032527</td><td>female_age30_term35</td><td>OK</td></tr>
+<tr><td>NBV下限</td><td>0</td><td>78,837.197195</td><td>female_age60_term10</td><td>OK</td></tr>
+<tr><td>PTM上限</td><td>1.05</td><td>-0.019947</td><td>male_age50_term20</td><td>NG</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="slide">
+        <header class="slide-header">
+          <h2>Sensitivity and Risks</h2>
+        </header>
+        <table>
+          <thead>
+            <tr>
+              <th>Scenario</th>
+              <th>Min IRR</th>
+              <th>Min NBV</th>
+              <th>Max PTM</th>
+              <th>Violations</th>
+            </tr>
+          </thead>
+          <tbody>
+<tr><td>base</td><td>6.88%</td><td>78,837</td><td>1.0699</td><td>0</td></tr>
+<tr><td>interest_down_10pct</td><td>7.20%</td><td>90,981</td><td>1.0796</td><td>3</td></tr>
+<tr><td>interest_up_10pct</td><td>6.56%</td><td>66,757</td><td>1.0604</td><td>0</td></tr>
+<tr><td>lapse_down_10pct</td><td>7.13%</td><td>80,241</td><td>1.0699</td><td>0</td></tr>
+<tr><td>lapse_up_10pct</td><td>6.62%</td><td>77,444</td><td>1.0699</td><td>0</td></tr>
+<tr><td>expense_down_10pct</td><td>7.97%</td><td>111,373</td><td>1.0699</td><td>0</td></tr>
+<tr><td>expense_up_10pct</td><td>5.47%</td><td>46,301</td><td>1.0699</td><td>0</td></tr>
+          </tbody>
+        </table>
+      </section>
+    </main>
+  </body>
+</html>

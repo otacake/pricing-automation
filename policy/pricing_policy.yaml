@@ -13,7 +13,15 @@ reporting:
   generate_executive_pptx: true
   report_language: ja
   chart_language: en
-  pptx_engine: html_hybrid
   pptx_theme: consulting-clean
   style_contract_path: docs/deck_style_contract.md
   strict_quality_gate: true
+  decision_compare:
+    enabled: true
+    counter_objective: maximize_min_irr
+  explainability:
+    strict_gate: true
+    procon_quant_count: 3
+    procon_qual_count: 3
+    require_causal_bridge: true
+    require_sensitivity_decomp: true

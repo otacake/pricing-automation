@@ -38,51 +38,63 @@ colors:
   background: "#F8FAFC"
   text: "#111827"
   grid: "#D1D5DB"
+narrative:
+  mode: "conclusion_first"
+  comparison_layout: "dedicated_main_slide"
+  text_density: "high"
+  min_lines_per_main_slide: 6
+  required_sections:
+    - "conclusion"
+    - "rationale"
+    - "risk"
+    - "decision_ask"
+  main_compare_slide_id: "decision_statement"
 slides:
   - id: "executive_summary"
     title: "Executive Summary"
-    message: "推奨価格と意思決定に必要な主要KPIを一枚で提示する。"
+    message: "結論先出しで主要KPIと経営判断を1枚で共有する。"
   - id: "decision_statement"
     title: "Decision Statement"
-    message: "今回の意思決定事項と適用条件を簡潔に明示する。"
+    message: "推奨案と対向案を同格で比較し、採否理由を明示する。"
   - id: "pricing_recommendation"
     title: "Pricing Recommendation"
-    message: "モデルポイント別の年払/月払保険料を提示する。"
+    message: "モデルポイント別の最終価格Pと決定要因を説明する。"
   - id: "constraint_status"
     title: "Constraint Status"
-    message: "Adequacy/Profitability/Soundnessの制約適合を示す。"
+    message: "Adequacy / Profitability / Soundness の制約充足を確認する。"
   - id: "cashflow_bridge"
     title: "Cashflow by Profit Source"
-    message: "利源別キャッシュフロー推移を年度別に可視化する。"
+    message: "利源別キャッシュフローの構造と経営含意を示す。"
   - id: "profit_source_decomposition"
     title: "Profit Source Decomposition"
-    message: "主要年度の利源構成比較で収益ドライバーを示す。"
+    message: "主要年度比較と利源寄与の因果分解を示す。"
   - id: "sensitivity"
     title: "Sensitivity and Risks"
-    message: "金利・失効・費用ショック時の耐性を示す。"
+    message: "支配シナリオと残余リスク、対応策を整理する。"
   - id: "governance"
     title: "Governance and Explainability"
-    message: "数値根拠、再現コマンド、監査証跡を明示する。"
+    message: "予定事業費の式・根拠・監査証跡を明示する。"
   - id: "decision_ask"
     title: "Decision Ask / Next Actions"
-    message: "承認依頼と次アクション、監視トリガーを提示する。"
+    message: "決裁事項・実行条件・再実行条件を確定する。"
 ---
 
 # Deck Style Contract
 
-このファイルは経営向けデッキの唯一のスタイル定義源です。  
-`report-executive-pptx --style-contract docs/deck_style_contract.md` で読み込まれます。
+このファイルは経営会議向けPPTXの見た目と説明様式の唯一の定義源です。  
+`python -m pricing.cli report-executive-pptx --style-contract docs/deck_style_contract.md` で読み込みます。
 
-## Editing Rules
+## 編集ルール
 
-- YAML frontmatter のキーは削除しないでください。
-- `slides` の件数は `main_slide_count` と一致させてください。
-- 色コードは `#RRGGBB` 形式を推奨します。
-- 日本語フォントは `Meiryo UI` を標準とし、環境差異に備えて fallback を維持してください。
-- 本文は自由に編集可能ですが、機械可読な設定は frontmatter を優先します。
+- YAML frontmatter の必須キーは削除しない。
+- `slides` の件数は `main_slide_count` と一致させる。
+- `narrative.required_sections` は固定順で維持する。
+- 日本語フォントは `Meiryo UI` を優先し、`Meiryo` をフォールバックにする。
+- 色は `#RRGGBB` で指定する。
 
-## Design Intent
+## 設計意図
 
-- 1スライド1メッセージで、詳細計算は付録へ退避します。
-- 装飾は控えめにし、数値の可読性を最優先します。
-- 主要な定量主張はすべて `trace_map` で出典を辿れるようにします。
+- 本文9枚は「結論 -> 根拠 -> リスク -> 意思決定要請」の順で統一する。
+- `decision_statement` は本文内の2案比較専用スライドとして扱う。
+- 主要数値は `trace_map` でソース追跡できることを前提とする。
+- 詳細検証は付録（A1-A6）へ分離し、本文は意思決定に集中する。

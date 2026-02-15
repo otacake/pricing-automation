@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 """
 Generate executive Markdown and PPTX deliverables from a pricing config.
@@ -23,7 +23,14 @@ from .diagnostics import build_execution_context, build_run_summary
 from .endowment import LoadingFunctionParams, calc_loading_parameters
 from .paths import resolve_base_dir_from_config
 from .profit_test import DEFAULT_LAPSE_RATE, DEFAULT_VALUATION_INTEREST, run_profit_test
-from .reporting import build_executive_deck_spec, evaluate_quality_gate, load_style_contract
+from .reporting import (
+    DecisionAlternative,
+    build_decision_alternatives,
+    build_executive_deck_spec,
+    build_explainability_artifacts,
+    evaluate_quality_gate,
+    load_style_contract,
+)
 from .report_feasibility import build_feasibility_report
 
 
@@ -48,6 +55,8 @@ class ExecutiveReportOutputs:
     spec_path: Path | None = None
     preview_html_path: Path | None = None
     quality_path: Path | None = None
+    explainability_path: Path | None = None
+    decision_compare_path: Path | None = None
 
 
 def _resolve_output_path(base_dir: Path, path: Path | None, default: str) -> Path:
@@ -91,19 +100,6 @@ def _configure_plot_font_for_language(plt, language: str) -> None:
             return
 
 
-def _require_pptx():
-    try:
-        from pptx import Presentation
-        from pptx.dml.color import RGBColor
-        from pptx.util import Inches, Pt
-    except ModuleNotFoundError as exc:  # pragma: no cover - depends on runtime env
-        raise RuntimeError(
-            "python-pptx is required for report-executive-pptx. "
-            "Install with: python -m pip install python-pptx"
-        ) from exc
-    return Presentation, RGBColor, Inches, Pt
-
-
 def _fmt_pct(value: float, digits: int = 2) -> str:
     return f"{value * 100:.{digits}f}%"
 
@@ -119,13 +115,6 @@ def _validate_language(language: str) -> str:
     return lang
 
 
-def _validate_engine(engine: str) -> str:
-    normalized = str(engine).strip().lower()
-    if normalized not in {"html_hybrid", "legacy"}:
-        raise ValueError(f"Unsupported engine: {engine}. Use 'html_hybrid' or 'legacy'.")
-    return normalized
-
-
 def _validate_theme(theme: str) -> str:
     normalized = str(theme).strip().lower()
     if normalized != "consulting-clean":
@@ -133,10 +122,21 @@ def _validate_theme(theme: str) -> str:
     return normalized
 
 
+def _normalize_decision_compare(value: str | bool) -> bool:
+    if isinstance(value, bool):
+        return value
+    normalized = str(value).strip().lower()
+    if normalized in {"on", "true", "1", "yes"}:
+        return True
+    if normalized in {"off", "false", "0", "no"}:
+        return False
+    raise ValueError("decision_compare must be 'on' or 'off'.")
+
+
 def _require_node_runtime() -> str:
     node = shutil.which("node")
     if node is None:
-        raise RuntimeError("Node.js is required for html_hybrid engine but was not found in PATH.")
+        raise RuntimeError("Node.js is required for PptxGenJS backend but was not found in PATH.")
     return node
 
 
@@ -165,13 +165,13 @@ def _scenario_label(name: str, language: str) -> str:
     if language == "en":
         return name
     mapping = {
-        "base": "ベース",
-        "interest_down_10pct": "金利-10%",
-        "interest_up_10pct": "金利+10%",
-        "lapse_down_10pct": "解約率-10%",
-        "lapse_up_10pct": "解約率+10%",
-        "expense_down_10pct": "事業費-10%",
-        "expense_up_10pct": "事業費+10%",
+        "base": "繝吶・繧ｹ",
+        "interest_down_10pct": "驥大茜-10%",
+        "interest_up_10pct": "驥大茜+10%",
+        "lapse_down_10pct": "隗｣邏・紫-10%",
+        "lapse_up_10pct": "隗｣邏・紫+10%",
+        "expense_down_10pct": "莠区･ｭ雋ｻ-10%",
+        "expense_up_10pct": "莠区･ｭ雋ｻ+10%",
     }
     return mapping.get(name, name)
 
@@ -180,11 +180,11 @@ def _constraint_label(name: str, language: str) -> str:
     if language == "en":
         return name
     mapping = {
-        "irr_hard": "IRR下限",
-        "nbv_hard": "NBV下限",
-        "loading_surplus_hard": "負荷余剰下限",
-        "loading_surplus_ratio_hard": "負荷余剰率下限",
-        "premium_to_maturity_hard_max": "PTM上限",
+        "irr_hard": "IRR荳矩剞",
+        "nbv_hard": "NBV荳矩剞",
+        "loading_surplus_hard": "雋闕ｷ菴吝臆荳矩剞",
+        "loading_surplus_ratio_hard": "雋闕ｷ菴吝臆邇・ｸ矩剞",
+        "premium_to_maturity_hard_max": "PTM荳企剞",
     }
     return mapping.get(name, name)
 
@@ -233,12 +233,12 @@ def _plot_cashflow_by_profit_source(
             ("investment_income", "運用収益", "#2a9d8f"),
         ]
         negative = [
-            ("benefit_outgo", "保険金・解約返戻金", "#d1495b"),
-            ("expense_outgo", "事業費", "#f4a261"),
+            ("benefit_outgo", "保険金・解約給付", "#d1495b"),
+            ("expense_outgo", "予定事業費", "#f4a261"),
             ("reserve_change_outgo", "責任準備金増減", "#6c757d"),
         ]
-        net_cf_label = "純キャッシュフロー"
-        chart_title = "年度別キャッシュフロー（利源別、全モデルポイント合算）"
+        net_cf_label = "ネットCF"
+        chart_title = "年度別キャッシュフロー（利源別・全モデルポイント合算）"
         x_label = "保険年度"
     else:
         positive = [
@@ -301,8 +301,8 @@ def _plot_annual_premium_by_model_point(
         color="#0b5fa5",
     )
     if language == "ja":
-        ax.set_title("モデルポイント別 年払保険料P")
-        ax.set_xlabel("年払営業保険料（JPY）")
+        ax.set_title("モデルポイント別 年間保険料P")
+        ax.set_xlabel("年間総保険料（JPY）")
     else:
         ax.set_title("Annual Premium P by Model Point")
         ax.set_xlabel("Gross Annual Premium (JPY)")
@@ -487,6 +487,63 @@ def _loading_calculation_rows(batch_result, params: LoadingFunctionParams | None
     return rows
 
 
+def _fallback_recommended_alternative(
+    *,
+    config: Mapping[str, Any],
+    run_summary: Mapping[str, Any],
+    result,
+    agg_cashflow: pd.DataFrame,
+    constraint_rows: list[dict[str, object]],
+    sensitivity_rows: list[dict[str, object]],
+) -> DecisionAlternative:
+    optimization_cfg = config.get("optimization", {})
+    if not isinstance(optimization_cfg, Mapping):
+        optimization_cfg = {}
+    objective_cfg = optimization_cfg.get("objective", {})
+    if not isinstance(objective_cfg, Mapping):
+        objective_cfg = {}
+    objective_mode = str(objective_cfg.get("mode", "penalty"))
+    metrics = run_summary.get("summary", {})
+    loading_params = read_loading_parameters(config)
+    params = (
+        {
+            "a0": float(loading_params.a0),
+            "a_age": float(loading_params.a_age),
+            "a_term": float(loading_params.a_term),
+            "a_sex": float(loading_params.a_sex),
+            "b0": float(loading_params.b0),
+            "b_age": float(loading_params.b_age),
+            "b_term": float(loading_params.b_term),
+            "b_sex": float(loading_params.b_sex),
+            "g0": float(loading_params.g0),
+            "g_term": float(loading_params.g_term),
+        }
+        if loading_params is not None
+        else {}
+    )
+    return DecisionAlternative(
+        alternative_id="recommended",
+        label="推奨案",
+        objective_mode=objective_mode,
+        run_summary=dict(run_summary),
+        summary_df=result.summary.sort_values("model_point"),
+        cashflow_df=agg_cashflow,
+        constraint_rows=[dict(row) for row in constraint_rows],
+        sensitivity_rows=[dict(row) for row in sensitivity_rows],
+        optimized_parameters=params,
+        optimization_success=True,
+        optimization_iterations=0,
+        metrics={
+            "min_irr": float(metrics.get("min_irr", 0.0)),
+            "min_nbv": float(metrics.get("min_nbv", 0.0)),
+            "min_loading_surplus_ratio": float(metrics.get("min_loading_surplus_ratio", 0.0)),
+            "max_premium_to_maturity": float(metrics.get("max_premium_to_maturity", 0.0)),
+            "violation_count": float(metrics.get("violation_count", 0.0)),
+        },
+        batch_result=result,
+    )
+
+
 def _build_markdown_report(
     *,
     config_path: Path,
@@ -504,26 +561,24 @@ def _build_markdown_report(
     summary = run_summary["summary"]
     cashflow_rel = Path(os.path.relpath(cashflow_chart_path, markdown_path.parent)).as_posix()
     premium_rel = Path(os.path.relpath(premium_chart_path, markdown_path.parent)).as_posix()
-    params = _get_loading_params(
-        yaml.safe_load(config_path.read_text(encoding="utf-8"))
-    )
+    params = _get_loading_params(yaml.safe_load(config_path.read_text(encoding="utf-8")))
     loading_rows = _loading_calculation_rows(batch_result, params)
     summary_df = batch_result.summary.sort_values("model_point")
     constraint_rows = _constraint_status_rows(run_summary)
 
     lines: list[str] = []
     report_title = "実現可能性レポート" if is_ja else "Feasibility Report"
-    generated_label = "作成日" if is_ja else "generated"
-    lines.append(f"# {report_title} ({config_path.name}, {generated_label} {datetime.now(timezone.utc).date().isoformat()})")
+    generated_label = "生成日" if is_ja else "generated"
+    lines.append(
+        f"# {report_title} ({config_path.name}, {generated_label} {datetime.now(timezone.utc).date().isoformat()})"
+    )
     lines.append("")
     lines.append("## サマリー" if is_ja else "## Summary")
     if is_ja:
         lines.append(
-            f"- 制約評価: `violation_count={summary['violation_count']}` / `{summary['model_point_count']}`モデルポイント。"
+            f"- 制約違反件数: `violation_count={summary['violation_count']}` / `{summary['model_point_count']}` モデルポイント。"
         )
-        lines.append(
-            f"- 収益性下限: `min_irr={summary['min_irr']:.6f}`（現行設定での最悪点）。"
-        )
+        lines.append(f"- 収益性下限: `min_irr={summary['min_irr']:.6f}`。")
         lines.append(f"- NBV下限: `min_nbv={summary['min_nbv']:.2f}` JPY。")
         lines.append(
             f"- 十分性下限: `min_loading_surplus_ratio={summary['min_loading_surplus_ratio']:.6f}`。"
@@ -535,9 +590,7 @@ def _build_markdown_report(
         lines.append(
             f"- Constraint status: `violation_count={summary['violation_count']}` across `{summary['model_point_count']}` model points."
         )
-        lines.append(
-            f"- Profitability floor: `min_irr={summary['min_irr']:.6f}` (worst model point at current setting)."
-        )
+        lines.append(f"- Profitability floor: `min_irr={summary['min_irr']:.6f}`.")
         lines.append(f"- NBV floor: `min_nbv={summary['min_nbv']:.2f}` JPY.")
         lines.append(
             f"- Adequacy floor: `min_loading_surplus_ratio={summary['min_loading_surplus_ratio']:.6f}`."
@@ -545,43 +598,43 @@ def _build_markdown_report(
         lines.append(
             f"- Soundness ceiling: `max_premium_to_maturity={summary['max_premium_to_maturity']:.6f}`."
         )
+
     lines.append("")
-    lines.append("## 価格提案（モデルポイント別P）" if is_ja else "## Pricing Recommendation (P by Model Point)")
-    if is_ja:
-        lines.append("|model_point|年払保険料P|月払保険料|irr|nbv|premium_to_maturity|")
-    else:
-        lines.append("|model_point|gross_annual_premium|monthly_premium|irr|nbv|premium_to_maturity|")
+    lines.append("## プライシング提案（モデルポイント別P）" if is_ja else "## Pricing Recommendation (P by Model Point)")
+    lines.append("|model_point|gross_annual_premium|monthly_premium|irr|nbv|premium_to_maturity|")
     lines.append("|---|---:|---:|---:|---:|---:|")
     for row in summary_df.itertuples(index=False):
         lines.append(
-            "|"
-            f"{row.model_point}|{int(row.gross_annual_premium)}|{int(row.monthly_premium)}|"
+            f"|{row.model_point}|{int(row.gross_annual_premium)}|{int(row.monthly_premium)}|"
             f"{row.irr:.6f}|{row.new_business_value:.2f}|{row.premium_to_maturity_ratio:.6f}|"
         )
+
     lines.append("")
     lines.append("## 制約ステータス" if is_ja else "## Constraint Status")
-    if is_ja:
-        lines.append("|constraint|min_gap|worst_model_point|status|")
-    else:
-        lines.append("|constraint|min_gap|worst_model_point|status|")
+    lines.append("|constraint|min_gap|worst_model_point|status|")
     lines.append("|---|---:|---|---|")
     for row in constraint_rows:
         status = "適合" if (is_ja and bool(row["all_ok"])) else "要対応" if is_ja else "PASS" if bool(row["all_ok"]) else "FAIL"
-        constraint_name = _constraint_label(str(row["constraint"]), language)
         lines.append(
-            f"|{constraint_name}|{float(row['min_gap']):.6f}|{row['worst_model_point']}|{status}|"
+            f"|{_constraint_label(str(row['constraint']), language)}|{float(row['min_gap']):.6f}|{row['worst_model_point']}|{status}|"
         )
+
     lines.append("")
-    lines.append("## ローディング式と係数" if is_ja else "## Loading Formula and Coefficients")
+    lines.append("## Loading式と係数" if is_ja else "## Loading Formula and Coefficients")
     lines.append("- `gross_rate = (net_rate + alpha / a + beta) / (1 - gamma)`")
     if params is None:
-        lines.append("- ローディングモード: 固定 `loading_alpha_beta_gamma`。" if is_ja else "- Loading mode: fixed `loading_alpha_beta_gamma`.")
+        lines.append(
+            "- loadingモード: 固定 `loading_alpha_beta_gamma`。"
+            if is_ja
+            else "- Loading mode: fixed `loading_alpha_beta_gamma`."
+        )
     else:
-        lines.append("- ローディングモード: `loading_parameters`。" if is_ja else "- Loading mode: `loading_parameters`.")
-        lines.append("|係数|値|" if is_ja else "|coefficient|value|")
+        lines.append("- loadingモード: `loading_parameters`。" if is_ja else "- Loading mode: `loading_parameters`.")
+        lines.append("|coefficient|value|")
         lines.append("|---|---:|")
         for key in ("a0", "a_age", "a_term", "a_sex", "b0", "b_age", "b_term", "b_sex", "g0", "g_term"):
             lines.append(f"|{key}|{getattr(params, key):.6f}|")
+
     lines.append("")
     lines.append(
         "## モデルポイント別 alpha/beta/gamma 計算（中間計算付き）"
@@ -589,58 +642,51 @@ def _build_markdown_report(
         else "## Per-model-point alpha/beta/gamma Calculations (with intermediate steps)"
     )
     for row in loading_rows:
+        lines.append(
+            f"### {row['model_point']} (age={row['issue_age']}, term={row['term_years']}, sex={row['sex']})"
+        )
         if is_ja:
-            lines.append(
-                f"### {row['model_point']} (age={row['issue_age']}, term={row['term_years']}, sex={row['sex']})"
-            )
             lines.append(
                 f"- 差分: `age_delta={row['age_delta']:.1f}`, `term_delta={row['term_delta']:.1f}`, `sex_indicator={row['sex_indicator']:.1f}`"
             )
-            lines.append(f"- alpha: `{row['alpha_expr']}`")
-            lines.append(f"- beta: `{row['beta_expr']}`")
-            lines.append(f"- gamma: `{row['gamma_expr']}`")
         else:
-            lines.append(
-                f"### {row['model_point']} (age={row['issue_age']}, term={row['term_years']}, sex={row['sex']})"
-            )
             lines.append(
                 f"- deltas: `age_delta={row['age_delta']:.1f}`, `term_delta={row['term_delta']:.1f}`, `sex_indicator={row['sex_indicator']:.1f}`"
             )
-            lines.append(f"- alpha: `{row['alpha_expr']}`")
-            lines.append(f"- beta: `{row['beta_expr']}`")
-            lines.append(f"- gamma: `{row['gamma_expr']}`")
+        lines.append(f"- alpha: `{row['alpha_expr']}`")
+        lines.append(f"- beta: `{row['beta_expr']}`")
+        lines.append(f"- gamma: `{row['gamma_expr']}`")
+
     lines.append("")
     lines.append("## 年度別キャッシュフロー（利源別）" if is_ja else "## Yearly Cashflow by Profit Source")
-    lines.append(f"![{'年度別キャッシュフロー（利源別）' if is_ja else 'Yearly Cashflow by Profit Source'}]({cashflow_rel})")
+    lines.append(
+        f"![{'年度別キャッシュフロー（利源別）' if is_ja else 'Yearly Cashflow by Profit Source'}]({cashflow_rel})"
+    )
     lines.append("")
-    lines.append(f"![{'モデルポイント別 年払保険料' if is_ja else 'Annual Premium by Model Point'}](" + premium_rel + ")")
+    lines.append(
+        f"![{'モデルポイント別 年間保険料' if is_ja else 'Annual Premium by Model Point'}]({premium_rel})"
+    )
+
     lines.append("")
     lines.append("## 感応度サマリー" if is_ja else "## Sensitivity Summary")
-    if is_ja:
-        lines.append("|scenario|min_irr|min_nbv|min_loading_surplus_ratio|max_premium_to_maturity|violation_count|")
-    else:
-        lines.append("|scenario|min_irr|min_nbv|min_loading_surplus_ratio|max_premium_to_maturity|violation_count|")
+    lines.append("|scenario|min_irr|min_nbv|min_loading_surplus_ratio|max_premium_to_maturity|violation_count|")
     lines.append("|---|---:|---:|---:|---:|---:|")
     for row in sensitivity_rows:
-        scenario_name = _scenario_label(str(row["scenario"]), language)
         lines.append(
-            f"|{scenario_name}|{float(row['min_irr']):.6f}|{float(row['min_nbv']):.2f}|"
+            f"|{_scenario_label(str(row['scenario']), language)}|{float(row['min_irr']):.6f}|{float(row['min_nbv']):.2f}|"
             f"{float(row['min_loading_surplus_ratio']):.6f}|{float(row['max_premium_to_maturity']):.6f}|"
             f"{int(row['violation_count'])}|"
         )
+
     lines.append("")
     lines.append("## Feasibility Deck メタ情報" if is_ja else "## Feasibility Deck Meta")
     scan = feasibility_deck["meta"]["scan"]
-    if is_ja:
-        lines.append(
-            f"- 掃引範囲: `r_start={scan['r_start']}`, `r_end={scan['r_end']}`, `r_step={scan['r_step']}`, `irr_threshold={scan['irr_threshold']}`"
-        )
-    else:
-        lines.append(
-            f"- sweep range: `r_start={scan['r_start']}`, `r_end={scan['r_end']}`, `r_step={scan['r_step']}`, `irr_threshold={scan['irr_threshold']}`"
-        )
+    lines.append(
+        f"- sweep range: `r_start={scan['r_start']}`, `r_end={scan['r_end']}`, `r_step={scan['r_step']}`, `irr_threshold={scan['irr_threshold']}`"
+    )
+
     lines.append("")
-    lines.append("## 再現手順" if is_ja else "## Reproducibility")
+    lines.append("## 再現コマンド" if is_ja else "## Reproducibility")
     lines.append("```powershell")
     lines.append("python -m pytest -q")
     lines.append(f"python -m pricing.cli run {config_path.as_posix()}")
@@ -658,211 +704,7 @@ def _build_markdown_report(
     return "\n".join(lines)
 
 
-def _set_text_style(text_frame, *, size, bold=False, color=None):
-    paragraph = text_frame.paragraphs[0]
-    run = paragraph.runs[0] if paragraph.runs else paragraph.add_run()
-    run.font.size = size
-    run.font.bold = bold
-    if color is not None:
-        run.font.color.rgb = color
-
-
-def _write_executive_pptx(
-    *,
-    out_path: Path,
-    run_summary: Mapping[str, Any],
-    summary_df: pd.DataFrame,
-    constraint_rows: list[dict[str, object]],
-    sensitivity_rows: list[dict[str, object]],
-    cashflow_chart_path: Path,
-    premium_chart_path: Path,
-    config_path: Path,
-    language: str,
-) -> Path:
-    language = _validate_language(language)
-    is_ja = language == "ja"
-    Presentation, RGBColor, Inches, Pt = _require_pptx()
-    prs = Presentation()
-
-    def add_title(slide, title: str, subtitle: str | None = None) -> None:
-        title_box = slide.shapes.add_textbox(Inches(0.5), Inches(0.2), Inches(12.3), Inches(0.8))
-        title_tf = title_box.text_frame
-        title_tf.text = title
-        _set_text_style(title_tf, size=Pt(30), bold=True, color=RGBColor(11, 95, 165))
-        if subtitle:
-            sub_box = slide.shapes.add_textbox(Inches(0.5), Inches(0.95), Inches(12.0), Inches(0.4))
-            sub_tf = sub_box.text_frame
-            sub_tf.text = subtitle
-            _set_text_style(sub_tf, size=Pt(13), bold=False, color=RGBColor(80, 80, 80))
-
-    summary = run_summary["summary"]
-
-    slide = prs.slides.add_slide(prs.slide_layouts[6])
-    summary_title = "エグゼクティブサマリー" if is_ja else "Executive Summary"
-    summary_subtitle = (
-        f"設定: {config_path.name} | 作成日: {datetime.now(timezone.utc).date().isoformat()}"
-        if is_ja
-        else f"Config: {config_path.name} | Generated: {datetime.now(timezone.utc).date().isoformat()}"
-    )
-    add_title(
-        slide,
-        summary_title,
-        summary_subtitle,
-    )
-    bullet_box = slide.shapes.add_textbox(Inches(0.7), Inches(1.5), Inches(11.8), Inches(4.8))
-    tf = bullet_box.text_frame
-    tf.word_wrap = True
-    bullets = (
-        [
-            "提案: 2枚目の価格テーブルP（年払保険料）を承認してください。",
-            f"制約結果: violation_count={summary['violation_count']} / model_points={summary['model_point_count']}。",
-            f"最小IRR={_fmt_pct(float(summary['min_irr']), 2)}、最小NBV={_fmt_jpy(float(summary['min_nbv']))}。",
-            f"最大premium-to-maturity={float(summary['max_premium_to_maturity']):.6f}。",
-            "全ての数値主張は out/run_summary_executive.json と out/feasibility_deck_executive.yaml で再現可能です。",
-        ]
-        if is_ja
-        else [
-            "Recommendation: approve pricing table P (annual premium) shown in Slide 2.",
-            f"Constraint result: violation_count={summary['violation_count']} / model_points={summary['model_point_count']}.",
-            f"Minimum IRR={_fmt_pct(float(summary['min_irr']), 2)}, minimum NBV={_fmt_jpy(float(summary['min_nbv']))}.",
-            f"Maximum premium-to-maturity={float(summary['max_premium_to_maturity']):.6f}.",
-            "All quantitative claims are reproducible from out/run_summary_executive.json and out/feasibility_deck_executive.yaml.",
-        ]
-    )
-    tf.text = bullets[0]
-    _set_text_style(tf, size=Pt(20), color=RGBColor(20, 20, 20))
-    for item in bullets[1:]:
-        p = tf.add_paragraph()
-        p.text = item
-        p.level = 0
-        p.runs[0].font.size = Pt(19)
-        p.runs[0].font.color.rgb = RGBColor(20, 20, 20)
-
-    slide = prs.slides.add_slide(prs.slide_layouts[6])
-    add_title(
-        slide,
-        "価格提案" if is_ja else "Pricing Recommendation",
-        "モデルポイント別 年払保険料P" if is_ja else "Annual Premium P by Model Point",
-    )
-    table_rows = len(summary_df) + 1
-    table = slide.shapes.add_table(table_rows, 6, Inches(0.4), Inches(1.5), Inches(8.1), Inches(4.7)).table
-    headers = (
-        ["モデルポイント", "年払P", "月払P", "IRR", "NBV", "PTM"]
-        if is_ja
-        else ["Model Point", "Annual P", "Monthly P", "IRR", "NBV", "PTM"]
-    )
-    for col, name in enumerate(headers):
-        table.cell(0, col).text = name
-    for idx, row in enumerate(summary_df.itertuples(index=False), start=1):
-        table.cell(idx, 0).text = str(row.model_point)
-        table.cell(idx, 1).text = f"{int(row.gross_annual_premium):,}"
-        table.cell(idx, 2).text = f"{int(row.monthly_premium):,}"
-        table.cell(idx, 3).text = _fmt_pct(float(row.irr), 2)
-        table.cell(idx, 4).text = f"{float(row.new_business_value):,.0f}"
-        table.cell(idx, 5).text = f"{float(row.premium_to_maturity_ratio):.4f}"
-    slide.shapes.add_picture(str(premium_chart_path), Inches(8.8), Inches(1.6), width=Inches(4.3))
-
-    slide = prs.slides.add_slide(prs.slide_layouts[6])
-    add_title(
-        slide,
-        "制約ステータス" if is_ja else "Constraint Status",
-        "十分性 / 収益性 / 健全性" if is_ja else "Adequacy / Profitability / Soundness",
-    )
-    c_table = slide.shapes.add_table(
-        len(constraint_rows) + 1, 4, Inches(0.4), Inches(1.5), Inches(12.0), Inches(4.0)
-    ).table
-    c_headers = (
-        ["制約", "最小ギャップ", "最悪モデルポイント", "判定"]
-        if is_ja
-        else ["Constraint", "Min Gap", "Worst Model Point", "Status"]
-    )
-    for col, name in enumerate(c_headers):
-        c_table.cell(0, col).text = name
-    for idx, row in enumerate(constraint_rows, start=1):
-        c_table.cell(idx, 0).text = _constraint_label(str(row["constraint"]), language)
-        c_table.cell(idx, 1).text = f"{float(row['min_gap']):.6f}"
-        c_table.cell(idx, 2).text = str(row["worst_model_point"])
-        if is_ja:
-            c_table.cell(idx, 3).text = "適合" if bool(row["all_ok"]) else "要対応"
-        else:
-            c_table.cell(idx, 3).text = "PASS" if bool(row["all_ok"]) else "FAIL"
-
-    slide = prs.slides.add_slide(prs.slide_layouts[6])
-    add_title(
-        slide,
-        "利源別キャッシュフロー" if is_ja else "Cashflow by Profit Source",
-        "全モデルポイント合算の年度分解" if is_ja else "Yearly decomposition across all model points",
-    )
-    slide.shapes.add_picture(str(cashflow_chart_path), Inches(0.5), Inches(1.5), width=Inches(12.3))
-
-    slide = prs.slides.add_slide(prs.slide_layouts[6])
-    add_title(
-        slide,
-        "感応度とリスク" if is_ja else "Sensitivity and Risks",
-        "金利・解約率・事業費を±10%変動" if is_ja else "10% shocks on interest, lapse, and expenses",
-    )
-    s_table = slide.shapes.add_table(
-        len(sensitivity_rows) + 1, 6, Inches(0.4), Inches(1.5), Inches(12.2), Inches(3.8)
-    ).table
-    s_headers = (
-        ["シナリオ", "最小IRR", "最小NBV", "最小LSR", "最大PTM", "違反件数"]
-        if is_ja
-        else ["Scenario", "Min IRR", "Min NBV", "Min LSR", "Max PTM", "Violations"]
-    )
-    for col, name in enumerate(s_headers):
-        s_table.cell(0, col).text = name
-    for idx, row in enumerate(sensitivity_rows, start=1):
-        s_table.cell(idx, 0).text = _scenario_label(str(row["scenario"]), language)
-        s_table.cell(idx, 1).text = _fmt_pct(float(row["min_irr"]), 2)
-        s_table.cell(idx, 2).text = f"{float(row['min_nbv']):,.0f}"
-        s_table.cell(idx, 3).text = f"{float(row['min_loading_surplus_ratio']):.4f}"
-        s_table.cell(idx, 4).text = f"{float(row['max_premium_to_maturity']):.4f}"
-        s_table.cell(idx, 5).text = str(int(row["violation_count"]))
-    risk_box = slide.shapes.add_textbox(Inches(0.5), Inches(5.5), Inches(12.0), Inches(1.0))
-    risk_tf = risk_box.text_frame
-    risk_tf.text = (
-        "主なリスク: 高年齢・短期の点でPTMマージンが薄く、事業費上振れでNBVが大きく低下し得ます。"
-        if is_ja
-        else "Key risk: PTM margin is tight for older/short-term points; "
-        "expense up-shock can materially reduce NBV."
-    )
-    _set_text_style(risk_tf, size=Pt(15), color=RGBColor(40, 40, 40))
-
-    slide = prs.slides.add_slide(prs.slide_layouts[6])
-    add_title(slide, "意思決定依頼 / 次アクション" if is_ja else "Decision Ask / Next Actions")
-    ask_box = slide.shapes.add_textbox(Inches(0.8), Inches(1.6), Inches(11.8), Inches(4.5))
-    ask_tf = ask_box.text_frame
-    ask_tf.word_wrap = True
-    asks = (
-        [
-            "2枚目の価格テーブルPを承認し、本番見積設定へ反映してください。",
-            "現行制約をロックし、毎月または前提変更時に再実行してください。",
-            "min_irr < 2.0% または max PTM > 1.056 で即時レビューを起動してください。",
-            "ガバナンス審査の統制成果物として out/run_summary_executive.json を利用してください。",
-        ]
-        if is_ja
-        else [
-            "Approve the pricing table P in Slide 2 for production quote setup.",
-            "Lock current constraints and rerun this report monthly or when assumptions change.",
-            "Trigger immediate review if min_irr falls below 2.0% or max PTM exceeds 1.056.",
-            "Use out/run_summary_executive.json as the control artifact for governance review.",
-        ]
-    )
-    ask_tf.text = asks[0]
-    _set_text_style(ask_tf, size=Pt(20), color=RGBColor(20, 20, 20))
-    for item in asks[1:]:
-        p = ask_tf.add_paragraph()
-        p.text = item
-        p.level = 0
-        p.runs[0].font.size = Pt(19)
-        p.runs[0].font.color.rgb = RGBColor(20, 20, 20)
-
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    prs.save(out_path)
-    return out_path
-
-
-def _write_executive_pptx_html_hybrid(
+def _write_executive_pptx_pptxgenjs(
     *,
     base_dir: Path,
     out_path: Path,
@@ -872,6 +714,7 @@ def _write_executive_pptx_html_hybrid(
     style_contract_path: Path,
     theme: str,
     strict_quality: bool,
+    config: Mapping[str, Any],
     run_summary: Mapping[str, Any],
     summary_df: pd.DataFrame,
     agg_cashflow: pd.DataFrame,
@@ -880,11 +723,17 @@ def _write_executive_pptx_html_hybrid(
     config_path: Path,
     language: str,
     chart_language: str,
+    alternatives_payload: Mapping[str, Any] | None,
+    decision_compare: Mapping[str, Any] | None,
+    explainability_report: Mapping[str, Any] | None,
+    explainability_strict: bool,
+    decision_compare_enabled: bool,
 ) -> tuple[Path, Path, Path]:
     node = _require_node_runtime()
     theme_name = _validate_theme(theme)
     contract = load_style_contract(style_contract_path)
     spec = build_executive_deck_spec(
+        config=config,
         config_path=config_path,
         run_summary=run_summary,
         summary_df=summary_df,
@@ -895,6 +744,9 @@ def _write_executive_pptx_html_hybrid(
         language=language,
         chart_language=chart_language,
         theme=theme_name,
+        alternatives=alternatives_payload,
+        decision_compare=decision_compare,
+        explainability_report=explainability_report,
     )
 
     spec_output.parent.mkdir(parents=True, exist_ok=True)
@@ -910,11 +762,11 @@ def _write_executive_pptx_html_hybrid(
     missing = [path for path in required_paths if not path.is_file()]
     if missing:
         joined = ", ".join(path.as_posix() for path in missing)
-        raise RuntimeError(f"html_hybrid renderer files are missing: {joined}")
+        raise RuntimeError(f"PptxGenJS renderer files are missing: {joined}")
 
     if not (tool_dir / "node_modules" / "pptxgenjs").exists():
         raise RuntimeError(
-            "html_hybrid engine requires Node dependencies. "
+            "PptxGenJS backend requires Node dependencies. "
             f"Run: npm --prefix {tool_dir.as_posix()} install"
         )
 
@@ -952,7 +804,7 @@ def _write_executive_pptx_html_hybrid(
             "--metrics-out",
             str(render_metrics_path),
         ],
-        failure_hint="Failed to render PPTX with html_hybrid engine.",
+        failure_hint="Failed to render PPTX with PptxGenJS backend.",
     )
     runtime_seconds = time.perf_counter() - start
 
@@ -963,11 +815,18 @@ def _write_executive_pptx_html_hybrid(
         spec=spec,
         render_metrics=render_metrics,
         runtime_seconds=runtime_seconds,
+        explainability_report=explainability_report,
+        decision_compare=decision_compare,
+        strict_explainability=bool(explainability_strict),
+        decision_compare_enabled=bool(decision_compare_enabled),
     )
     quality_output.write_text(json.dumps(quality.to_dict(), indent=2, ensure_ascii=True), encoding="utf-8")
-    if strict_quality and not quality.passed:
+    if (strict_quality or explainability_strict) and not quality.passed:
+        failed_checks = [name for name, ok in quality.checks.items() if not ok]
+        failed_checks_text = ", ".join(failed_checks) if failed_checks else "unknown"
         raise RuntimeError(
-            "html_hybrid quality gate failed. "
+            "PptxGenJS quality gate failed. "
+            f"failed_checks=[{failed_checks_text}]. "
             f"See details at: {quality_output.as_posix()}"
         )
     return spec_output, preview_output, quality_output
@@ -988,18 +847,26 @@ def report_executive_pptx_from_config(
     include_sensitivity: bool = True,
     language: str = "ja",
     chart_language: str = "en",
-    engine: str = "html_hybrid",
     theme: str = "consulting-clean",
     style_contract_path: Path | None = None,
     spec_out_path: Path | None = None,
     preview_html_path: Path | None = None,
     quality_out_path: Path | None = None,
     strict_quality: bool = True,
+    decision_compare: str | bool = "on",
+    counter_objective: str = "maximize_min_irr",
+    explainability_strict: bool = True,
+    explain_out_path: Path | None = None,
+    compare_out_path: Path | None = None,
+    procon_quant_count: int = 3,
+    procon_qual_count: int = 3,
+    require_causal_bridge: bool = True,
+    require_sensitivity_decomp: bool = True,
 ) -> ExecutiveReportOutputs:
     language = _validate_language(language)
     chart_language = _validate_language(chart_language)
-    engine = _validate_engine(engine)
     theme = _validate_theme(theme)
+    decision_compare_enabled = _normalize_decision_compare(decision_compare)
     config_path = config_path.expanduser().resolve()
     config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
     base_dir = resolve_base_dir_from_config(config_path)
@@ -1012,22 +879,61 @@ def report_executive_pptx_from_config(
         command="pricing.cli report-executive-pptx",
         argv=[
             str(config_path),
-            "--engine",
-            engine,
             "--theme",
             theme,
             "--lang",
             language,
             "--chart-lang",
             chart_language,
+            "--decision-compare",
+            "on" if decision_compare_enabled else "off",
+            "--counter-objective",
+            str(counter_objective),
         ],
     )
-    run_summary = build_run_summary(
+    baseline_run_summary = build_run_summary(
         config,
         result,
         source="report_executive_pptx",
         execution_context=execution_context,
     )
+    baseline_agg_cashflow = _aggregate_cashflow(result)
+    baseline_constraint_rows = _constraint_status_rows(baseline_run_summary)
+
+    counter_alternative: DecisionAlternative | None = None
+    if decision_compare_enabled:
+        recommended_alternative, counter_alternative = build_decision_alternatives(
+            config=config,
+            base_dir=base_dir,
+            execution_context=execution_context,
+            counter_objective=str(counter_objective),
+            include_sensitivity=bool(include_sensitivity),
+            language=language,
+        )
+    else:
+        baseline_sensitivity_rows = (
+            _build_sensitivity_rows(
+                config,
+                base_dir,
+                base_dir / "out" / "charts" / "executive" / "sensitivity",
+            )
+            if include_sensitivity
+            else [_scenario_summary("base", config, base_dir)]
+        )
+        recommended_alternative = _fallback_recommended_alternative(
+            config=config,
+            run_summary=baseline_run_summary,
+            result=result,
+            agg_cashflow=baseline_agg_cashflow,
+            constraint_rows=baseline_constraint_rows,
+            sensitivity_rows=baseline_sensitivity_rows,
+        )
+
+    run_summary = recommended_alternative.run_summary
+    result = recommended_alternative.batch_result
+    agg_cashflow = recommended_alternative.cashflow_df
+    sensitivity_rows = recommended_alternative.sensitivity_rows
+    constraint_rows = recommended_alternative.constraint_rows
 
     run_summary_output = _resolve_output_path(
         base_dir,
@@ -1039,6 +945,44 @@ def report_executive_pptx_from_config(
         json.dumps(run_summary, indent=2, ensure_ascii=True),
         encoding="utf-8",
     )
+
+    effective_require_sensitivity = bool(require_sensitivity_decomp and include_sensitivity)
+    explainability_report, decision_compare_payload = build_explainability_artifacts(
+        config=config,
+        config_path=config_path,
+        run_summary_source_path=run_summary_output.as_posix(),
+        recommended=recommended_alternative,
+        counter=counter_alternative,
+        quant_count=int(procon_quant_count),
+        qual_count=int(procon_qual_count),
+        require_causal_bridge=bool(require_causal_bridge),
+        require_sensitivity_decomp=effective_require_sensitivity,
+        language=language,
+    )
+    explainability_output = _resolve_output_path(
+        base_dir,
+        explain_out_path,
+        "out/explainability_report.json",
+    )
+    decision_compare_output = _resolve_output_path(
+        base_dir,
+        compare_out_path,
+        "out/decision_compare.json",
+    )
+    explainability_output.parent.mkdir(parents=True, exist_ok=True)
+    decision_compare_output.parent.mkdir(parents=True, exist_ok=True)
+    explainability_output.write_text(
+        json.dumps(explainability_report, indent=2, ensure_ascii=True),
+        encoding="utf-8",
+    )
+    decision_compare_output.write_text(
+        json.dumps(decision_compare_payload, indent=2, ensure_ascii=True),
+        encoding="utf-8",
+    )
+    alternatives_payload: dict[str, Any] = {
+        "recommended": recommended_alternative.to_payload(),
+        "counter": counter_alternative.to_payload() if counter_alternative is not None else None,
+    }
 
     deck = build_feasibility_report(
         config=config,
@@ -1058,7 +1002,6 @@ def report_executive_pptx_from_config(
 
     chart_output_dir = _resolve_output_path(base_dir, chart_dir, "out/charts/executive")
     chart_output_dir.mkdir(parents=True, exist_ok=True)
-    agg_cashflow = _aggregate_cashflow(result)
     cashflow_chart = _plot_cashflow_by_profit_source(
         agg_cashflow,
         chart_output_dir / "cashflow_by_profit_source.png",
@@ -1068,12 +1011,6 @@ def report_executive_pptx_from_config(
         result.summary,
         chart_output_dir / "annual_premium_by_model_point.png",
         language=chart_language,
-    )
-
-    sensitivity_rows = (
-        _build_sensitivity_rows(config, base_dir, chart_output_dir / "sensitivity")
-        if include_sensitivity
-        else [_scenario_summary("base", config, base_dir)]
     )
 
     markdown_output = _resolve_output_path(base_dir, markdown_path, "reports/feasibility_report.md")
@@ -1094,61 +1031,53 @@ def report_executive_pptx_from_config(
     )
 
     pptx_output = _resolve_output_path(base_dir, out_path, "reports/executive_pricing_deck.pptx")
-    constraint_rows = _constraint_status_rows(run_summary)
     spec_output: Path | None = None
     preview_output: Path | None = None
     quality_output: Path | None = None
-    if engine == "legacy":
-        _write_executive_pptx(
-            out_path=pptx_output,
-            run_summary=run_summary,
-            summary_df=result.summary.sort_values("model_point"),
-            constraint_rows=constraint_rows,
-            sensitivity_rows=sensitivity_rows,
-            cashflow_chart_path=cashflow_chart,
-            premium_chart_path=premium_chart,
-            config_path=config_path,
-            language=language,
-        )
-    else:
-        contract_path = _resolve_output_path(
-            base_dir,
-            style_contract_path,
-            "docs/deck_style_contract.md",
-        )
-        spec_output = _resolve_output_path(
-            base_dir,
-            spec_out_path,
-            "out/executive_deck_spec.json",
-        )
-        preview_output = _resolve_output_path(
-            base_dir,
-            preview_html_path,
-            "reports/executive_pricing_deck_preview.html",
-        )
-        quality_output = _resolve_output_path(
-            base_dir,
-            quality_out_path,
-            "out/executive_deck_quality.json",
-        )
-        _write_executive_pptx_html_hybrid(
-            base_dir=base_dir,
-            out_path=pptx_output,
-            spec_output=spec_output,
-            preview_output=preview_output,
-            quality_output=quality_output,
-            style_contract_path=contract_path,
-            theme=theme,
-            strict_quality=bool(strict_quality),
-            run_summary=run_summary,
-            summary_df=result.summary.sort_values("model_point"),
-            agg_cashflow=agg_cashflow,
-            constraint_rows=constraint_rows,
-            sensitivity_rows=sensitivity_rows,
-            config_path=config_path,
-            language=language,
-            chart_language=chart_language,
-        )
+    contract_path = _resolve_output_path(
+        base_dir,
+        style_contract_path,
+        "docs/deck_style_contract.md",
+    )
+    spec_output = _resolve_output_path(
+        base_dir,
+        spec_out_path,
+        "out/executive_deck_spec.json",
+    )
+    preview_output = _resolve_output_path(
+        base_dir,
+        preview_html_path,
+        "reports/executive_pricing_deck_preview.html",
+    )
+    quality_output = _resolve_output_path(
+        base_dir,
+        quality_out_path,
+        "out/executive_deck_quality.json",
+    )
+    _write_executive_pptx_pptxgenjs(
+        base_dir=base_dir,
+        out_path=pptx_output,
+        spec_output=spec_output,
+        preview_output=preview_output,
+        quality_output=quality_output,
+        style_contract_path=contract_path,
+        theme=theme,
+        strict_quality=bool(strict_quality),
+        config=config,
+        run_summary=run_summary,
+        summary_df=result.summary.sort_values("model_point"),
+        agg_cashflow=agg_cashflow,
+        constraint_rows=constraint_rows,
+        sensitivity_rows=sensitivity_rows,
+        config_path=config_path,
+        language=language,
+        chart_language=chart_language,
+        alternatives_payload=alternatives_payload,
+        decision_compare=decision_compare_payload,
+        explainability_report=explainability_report,
+        explainability_strict=bool(explainability_strict),
+        decision_compare_enabled=bool(decision_compare_enabled),
+    )
 
     return ExecutiveReportOutputs(
         pptx_path=pptx_output,
@@ -1160,4 +1089,7 @@ def report_executive_pptx_from_config(
         spec_path=spec_output,
         preview_html_path=preview_output,
         quality_path=quality_output,
+        explainability_path=explainability_output,
+        decision_compare_path=decision_compare_output,
     )
+

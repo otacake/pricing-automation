@@ -49,6 +49,8 @@ class PDCACycleOutputs:
     executive_spec_path: Path | None = None
     executive_preview_path: Path | None = None
     executive_quality_path: Path | None = None
+    executive_explainability_path: Path | None = None
+    executive_compare_path: Path | None = None
 
 
 def _sha256_file(path: Path) -> str | None:
@@ -250,6 +252,8 @@ def run_pdca_cycle(
     executive_spec_path: Path | None = None
     executive_preview_path: Path | None = None
     executive_quality_path: Path | None = None
+    executive_explainability_path: Path | None = None
+    executive_compare_path: Path | None = None
     if policy.reporting.generate_markdown or policy.reporting.generate_executive_pptx:
         if not (policy.reporting.generate_markdown and policy.reporting.generate_executive_pptx):
             raise ValueError(
@@ -269,13 +273,21 @@ def run_pdca_cycle(
             irr_threshold=policy.feasibility.irr_threshold,
             language=policy.reporting.report_language,
             chart_language=policy.reporting.chart_language,
-            engine=policy.reporting.pptx_engine,
             theme=policy.reporting.pptx_theme,
             style_contract_path=Path(policy.reporting.style_contract_path),
             spec_out_path=out_dir / f"executive_deck_spec_{run_id}.json",
             preview_html_path=reports_dir / f"executive_pricing_deck_preview_{run_id}.html",
             quality_out_path=out_dir / f"executive_deck_quality_{run_id}.json",
             strict_quality=policy.reporting.strict_quality_gate,
+            decision_compare="on" if policy.reporting.decision_compare.enabled else "off",
+            counter_objective=policy.reporting.decision_compare.counter_objective,
+            explainability_strict=policy.reporting.explainability.strict_gate,
+            explain_out_path=out_dir / f"explainability_report_{run_id}.json",
+            compare_out_path=out_dir / f"decision_compare_{run_id}.json",
+            procon_quant_count=policy.reporting.explainability.procon_quant_count,
+            procon_qual_count=policy.reporting.explainability.procon_qual_count,
+            require_causal_bridge=policy.reporting.explainability.require_causal_bridge,
+            require_sensitivity_decomp=policy.reporting.explainability.require_sensitivity_decomp,
         )
         commands.append(
             {
@@ -283,10 +295,13 @@ def run_pdca_cycle(
                 "config_path": str(active_config_path),
                 "report_language": policy.reporting.report_language,
                 "chart_language": policy.reporting.chart_language,
-                "pptx_engine": policy.reporting.pptx_engine,
+                "pptx_backend": "pptxgenjs",
                 "pptx_theme": policy.reporting.pptx_theme,
                 "style_contract_path": policy.reporting.style_contract_path,
                 "strict_quality_gate": policy.reporting.strict_quality_gate,
+                "decision_compare_enabled": policy.reporting.decision_compare.enabled,
+                "counter_objective": policy.reporting.decision_compare.counter_objective,
+                "explainability_strict_gate": policy.reporting.explainability.strict_gate,
             }
         )
         markdown_report_path = report_outputs.markdown_path
@@ -294,6 +309,8 @@ def run_pdca_cycle(
         executive_spec_path = report_outputs.spec_path
         executive_preview_path = report_outputs.preview_html_path
         executive_quality_path = report_outputs.quality_path
+        executive_explainability_path = report_outputs.explainability_path
+        executive_compare_path = report_outputs.decision_compare_path
 
     manifest_path = out_dir / f"run_manifest_{run_id}.json"
     manifest = {
@@ -325,6 +342,10 @@ def run_pdca_cycle(
             "executive_spec_path": str(executive_spec_path) if executive_spec_path else None,
             "executive_preview_path": str(executive_preview_path) if executive_preview_path else None,
             "executive_quality_path": str(executive_quality_path) if executive_quality_path else None,
+            "executive_explainability_path": str(executive_explainability_path)
+            if executive_explainability_path
+            else None,
+            "executive_compare_path": str(executive_compare_path) if executive_compare_path else None,
         },
     }
     manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=True), encoding="utf-8")
@@ -354,4 +375,6 @@ def run_pdca_cycle(
         executive_spec_path=executive_spec_path,
         executive_preview_path=executive_preview_path,
         executive_quality_path=executive_quality_path,
+        executive_explainability_path=executive_explainability_path,
+        executive_compare_path=executive_compare_path,
     )

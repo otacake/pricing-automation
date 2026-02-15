@@ -61,6 +61,36 @@ function replaceAllTokens(template, replacements) {
   return output;
 }
 
+function asStringArray(value) {
+  return (Array.isArray(value) ? value : [])
+    .map((item) => String(item).trim())
+    .filter((item) => item.length > 0);
+}
+
+function narrativeToListItems(block, isJa) {
+  if (!block || typeof block !== "object") {
+    return "<li>-</li>";
+  }
+  const rows = [];
+  const conclusion = String(block.conclusion ?? "").trim();
+  if (conclusion) {
+    rows.push(`${isJa ? "結論" : "Conclusion"}: ${conclusion}`);
+  }
+  asStringArray(block.rationale).forEach((item, index) => {
+    rows.push(`${isJa ? `根拠${index + 1}` : `Rationale ${index + 1}`}: ${item}`);
+  });
+  asStringArray(block.risk).forEach((item) => {
+    rows.push(`${isJa ? "リスク" : "Risk"}: ${item}`);
+  });
+  asStringArray(block.decision_ask).forEach((item) => {
+    rows.push(`${isJa ? "意思決定要請" : "Decision Ask"}: ${item}`);
+  });
+  if (rows.length === 0) {
+    return "<li>-</li>";
+  }
+  return rows.map((row) => `<li>${escapeHtml(row)}</li>`).join("\n");
+}
+
 const args = parseArgs(process.argv);
 const specPath = requireArg(args, "spec");
 const templatePath = requireArg(args, "template");
@@ -73,6 +103,7 @@ let css = fs.readFileSync(cssPath, "utf8");
 
 const colors = spec?.style?.colors ?? {};
 const fonts = spec?.style?.fonts ?? {};
+const isJa = (spec.meta?.language ?? "ja") === "ja";
 const cssReplacements = {
   COLOR_PRIMARY: colors.primary ?? "#0B5FA5",
   COLOR_SECONDARY: colors.secondary ?? "#5B6B7A",
@@ -143,6 +174,52 @@ const sensitivityRows = (spec.sensitivity ?? [])
   })
   .join("\n");
 
+const compare = spec.decision_compare ?? {};
+const compareReasons = asStringArray(compare.adoption_reason);
+const compareSummary = compareReasons
+  .slice(0, 3)
+  .map((line) => `<li>${escapeHtml(line)}</li>`)
+  .join("\n");
+const compareObjectives = (() => {
+  const objectives = compare.objectives ?? {};
+  return `recommended objective: ${String(objectives.recommended ?? "-")} / counter objective: ${String(objectives.counter ?? "-")}`;
+})();
+
+const causalRows = ((spec.causal_bridge ?? {}).components ?? [])
+  .map((row) => {
+    return [
+      "<tr>",
+      `<td>${escapeHtml(row.label ?? row.component ?? "")}</td>`,
+      `<td>${Number(row.recommended_total ?? 0).toLocaleString("en-US", { maximumFractionDigits: 0 })}</td>`,
+      `<td>${Number(row.counter_total ?? 0).toLocaleString("en-US", { maximumFractionDigits: 0 })}</td>`,
+      `<td>${Number(row.delta_recommended_minus_counter ?? 0).toLocaleString("en-US", { maximumFractionDigits: 0 })}</td>`,
+      "</tr>",
+    ].join("");
+  })
+  .join("\n");
+
+const narrativeMap = spec.management_narrative ?? {};
+const mainSlideChecks = spec.main_slide_checks ?? {};
+const perSlideChecks = Array.isArray(mainSlideChecks.per_slide) ? mainSlideChecks.per_slide : [];
+const mainSlideCheckRows = perSlideChecks
+  .map((row) => {
+    return [
+      "<tr>",
+      `<td>${escapeHtml(row.slide_id ?? "")}</td>`,
+      `<td>${Number(row.line_count ?? 0)}</td>`,
+      `<td>${Boolean(row.required_sections_present ?? false)}</td>`,
+      `<td>${Boolean(row.density_ok ?? false)}</td>`,
+      `<td>${Boolean(row.section_order_ok ?? false)}</td>`,
+      "</tr>",
+    ].join("");
+  })
+  .join("\n");
+const mainSlideCheckSummary = `coverage=${Number(mainSlideChecks.coverage ?? 0).toFixed(3)}, density_ok=${String(
+  Boolean(mainSlideChecks.density_ok)
+)}, main_compare_present=${String(Boolean(mainSlideChecks.main_compare_present))}, decision_style_ok=${String(
+  Boolean(mainSlideChecks.decision_style_ok)
+)}`;
+
 const html = replaceAllTokens(template, {
   THEME_CSS: css,
   HEADLINE: escapeHtml(spec.headline ?? ""),
@@ -150,6 +227,16 @@ const html = replaceAllTokens(template, {
   PRICING_ROWS: pricingRows,
   CONSTRAINT_ROWS: constraintRows,
   SENSITIVITY_ROWS: sensitivityRows,
+  COMPARE_OBJECTIVES: escapeHtml(compareObjectives),
+  COMPARE_SUMMARY: compareSummary || "<li>-</li>",
+  CAUSAL_ROWS: causalRows,
+  MAIN_SLIDE_CHECK_ROWS: mainSlideCheckRows || "<tr><td colspan=\"5\">-</td></tr>",
+  MAIN_SLIDE_CHECK_SUMMARY: escapeHtml(mainSlideCheckSummary),
+  NARRATIVE_EXEC_SUMMARY: narrativeToListItems(narrativeMap.executive_summary, isJa),
+  NARRATIVE_DECISION_STATEMENT: narrativeToListItems(narrativeMap.decision_statement, isJa),
+  NARRATIVE_PRICING_RECOMMENDATION: narrativeToListItems(narrativeMap.pricing_recommendation, isJa),
+  NARRATIVE_CONSTRAINT_STATUS: narrativeToListItems(narrativeMap.constraint_status, isJa),
+  NARRATIVE_SENSITIVITY: narrativeToListItems(narrativeMap.sensitivity, isJa),
 });
 
 fs.mkdirSync(path.dirname(outPath), { recursive: true });

@@ -49,6 +49,13 @@ body {
   color: var(--color-primary);
 }
 
+.slide h3 {
+  margin: 14px 0 8px;
+  font-size: 0.95rem;
+  font-family: var(--font-en);
+  color: var(--color-secondary);
+}
+
 .headline {
   font-size: 1.15rem;
   margin: 8px 0 16px;
@@ -99,4 +106,14 @@ th {
   background: rgba(11, 95, 165, 0.08);
   color: var(--color-primary);
   font-family: var(--font-en);
+}
+
+.narrative-list {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.narrative-list li {
+  margin: 3px 0;
+  font-size: 0.84rem;
 }

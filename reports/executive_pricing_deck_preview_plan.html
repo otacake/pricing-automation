@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Executive Pricing Deck Preview</title>
+    <style>
+:root {
+  --color-primary: #0B5FA5;
+  --color-secondary: #5B6B7A;
+  --color-accent: #F59E0B;
+  --color-positive: #2A9D8F;
+  --color-negative: #D1495B;
+  --color-background: #F8FAFC;
+  --color-text: #111827;
+  --color-grid: #D1D5DB;
+  --font-ja: "Meiryo UI", "Meiryo", sans-serif;
+  --font-en: "Calibri", "Arial", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 24px;
+  background: linear-gradient(160deg, #f9fbff 0%, #eef3f8 100%);
+  color: var(--color-text);
+  font-family: var(--font-ja);
+}
+
+.deck {
+  display: grid;
+  gap: 16px;
+}
+
+.slide {
+  border: 1px solid var(--color-grid);
+  border-radius: 10px;
+  padding: 20px;
+  background: #ffffff;
+  box-shadow: 0 6px 24px rgba(17, 24, 39, 0.06);
+}
+
+.slide-header {
+  border-left: 5px solid var(--color-primary);
+  padding-left: 10px;
+  margin-bottom: 14px;
+}
+
+.slide h1,
+.slide h2 {
+  margin: 0;
+  font-family: var(--font-en);
+  color: var(--color-primary);
+}
+
+.slide h3 {
+  margin: 14px 0 8px;
+  font-size: 0.95rem;
+  font-family: var(--font-en);
+  color: var(--color-secondary);
+}
+
+.headline {
+  font-size: 1.15rem;
+  margin: 8px 0 16px;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.card {
+  border: 1px solid var(--color-grid);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--color-background);
+}
+
+.card .label {
+  display: block;
+  color: var(--color-secondary);
+  font-size: 0.8rem;
+}
+
+.card .value {
+  display: block;
+  margin-top: 5px;
+  font-family: var(--font-en);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  border: 1px solid var(--color-grid);
+  padding: 7px 8px;
+  text-align: left;
+  font-size: 0.85rem;
+}
+
+th {
+  background: rgba(11, 95, 165, 0.08);
+  color: var(--color-primary);
+  font-family: var(--font-en);
+}
+
+.narrative-list {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.narrative-list li {
+  margin: 3px 0;
+  font-size: 0.84rem;
+}
+
+    </style>
+  </head>
+  <body>
+    <main class="deck">
+      <section class="slide">
+        <header class="slide-header">
+          <h1>Executive Summary</h1>
+        </header>
+        <p class="headline">十分性・収益性・健全性を同時充足する価格提案</p>
+        <div class="cards">
+<article class="card"><span class="label">最小IRR</span><span class="value">6.81%</span></article>
+<article class="card"><span class="label">最小NBV</span><span class="value">JPY 62,735</span></article>
+<article class="card"><span class="label">最大PTM</span><span class="value">1.0556</span></article>
+<article class="card"><span class="label">違反件数</span><span class="value">0</span></article>
+        </div>
+        <h3>Management Narrative</h3>
+        <ul class="narrative-list">
+<li>結論: 推奨案で十分性・収益性・健全性を同時に満たし、経営会議で決裁可能な価格帯を確保しました。</li>
+<li>根拠1: KPIは min IRR=6.81%, min NBV=62,735 JPY, max PTM=1.0556, 違反件数=0件です。</li>
+<li>根拠2: 利源別累計純CFは 3,184,064 JPY で、入金に占める利差益寄与は 26.96% です。</li>
+<li>根拠3: 推奨案は制約逸脱を増やさずに最小IRR/NBVを維持する方針を採用。</li>
+<li>リスク: 主要リスクは interest_down_10pct ショックで、感応度の悪化が先に現れる点を監視します。</li>
+<li>意思決定要請: 本会議では推奨案を承認し、対向案は比較対象として棄却する判断をお願いします。</li>
+        </ul>
+      </section>
+
+      <section class="slide">
+        <header class="slide-header">
+          <h2>Decision Statement (2 Alternatives)</h2>
+        </header>
+        <p>recommended objective: maximize_min_irr / counter objective: penalty</p>
+        <ul>
+<li>推奨案は制約逸脱を増やさずに最小IRR/NBVを維持する方針を採用。</li>
+<li>対向案との差分は利差益寄与とPTM上限余力のバランスで評価。</li>
+<li>許容するリスクと守るべき下限を分離して意思決定を固定化。</li>
+        </ul>
+        <h3>Management Narrative</h3>
+        <ul class="narrative-list">
+<li>結論: 推奨案と対向案を同条件で比較した結果、推奨案を採択し対向案は不採択とします。</li>
+<li>根拠1: 目的関数は推奨案=maximize_min_irr, 対向案=penalty です。</li>
+<li>根拠2: 指標差（推奨-対向）は min IRR=0.009799, min NBV=10,292, max PTM=0.023950 です。</li>
+<li>根拠3: 対向案との差分は利差益寄与とPTM上限余力のバランスで評価。</li>
+<li>リスク: 対向案の一部モデルポイントは短期競争力が高い可能性があるため、販売現場には説明テンプレートを配布します。</li>
+<li>意思決定要請: 本会議で推奨案採択・対向案不採択を明文化し、次回改定まで同一ポリシーで運用する決裁をお願いします。</li>
+        </ul>
+      </section>
+
+      <section class="slide">
+        <header class="slide-header">
+          <h2>Pricing Recommendation</h2>
+        </header>
+        <table>
+          <thead>
+            <tr>
+              <th>Model Point</th>
+              <th>Annual P</th>
+              <th>Monthly P</th>
+              <th>IRR</th>
+              <th>NBV</th>
+              <th>PTM</th>
+            </tr>
+          </thead>
+          <tbody>
+<tr><td>female_age30_term35</td><td>88,631</td><td>7,385.9</td><td>6.97%</td><td>183,020</td><td>1.0340</td></tr>
+<tr><td>female_age40_term25</td><td>123,785</td><td>10,315.4</td><td>8.72%</td><td>248,241</td><td>1.0315</td></tr>
+<tr><td>female_age50_term20</td><td>155,615</td><td>12,967.9</td><td>9.21%</td><td>221,417</td><td>1.0374</td></tr>
+<tr><td>female_age60_term10</td><td>310,963</td><td>25,913.6</td><td>6.92%</td><td>62,735</td><td>1.0365</td></tr>
+<tr><td>male_age30_term35</td><td>89,218</td><td>7,434.8</td><td>6.81%</td><td>173,539</td><td>1.0409</td></tr>
+<tr><td>male_age40_term25</td><td>124,755</td><td>10,396.3</td><td>8.43%</td><td>232,568</td><td>1.0396</td></tr>
+<tr><td>male_age50_term20</td><td>158,333</td><td>13,194.4</td><td>8.54%</td><td>193,586</td><td>1.0556</td></tr>
+          </tbody>
+        </table>
+        <h3>Management Narrative</h3>
+        <ul class="narrative-list">
+<li>結論: 最終Pは制約を満たす範囲で、競争力と収益性のバランスを取る水準に設定しました。</li>
+<li>根拠1: モデルポイント別の年払Pレンジは 88,631 〜 310,963 です。</li>
+<li>根拠2: min IRR=6.81% と min NBV=62,735 JPY を下限に維持し、価格のみの過度な引き下げを抑制しています。</li>
+<li>根拠3: 価格差の主因は予定事業費と利差益寄与の差で、単純な平均化は採用していません。</li>
+<li>リスク: 低年齢・長期点での過度なディスカウントは将来損益を毀損するため、再見積時も同一制約を適用します。</li>
+<li>意思決定要請: 価格テーブルを見積システムへ反映し、例外設定はPDCAログへ記録する運用を承認してください。</li>
+        </ul>
+      </section>
+
+      <section class="slide">
+        <header class="slide-header">
+          <h2>Constraint Status</h2>
+        </header>
+        <table>
+          <thead>
+            <tr>
+              <th>Constraint</th>
+              <th>Threshold</th>
+              <th>Min Gap</th>
+              <th>Worst Model Point</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+<tr><td>alpha_non_negative</td><td>0</td><td>0.002</td><td>male_age30_term35</td><td>OK</td></tr>
+<tr><td>beta_non_negative</td><td>0</td><td>0.005</td><td>male_age30_term35</td><td>OK</td></tr>
+<tr><td>gamma_non_negative</td><td>0</td><td>0</td><td>male_age30_term35</td><td>OK</td></tr>
+<tr><td>IRR下限</td><td>0.02</td><td>0.048141</td><td>male_age30_term35</td><td>OK</td></tr>
+<tr><td>loading_positive</td><td>0</td><td>15,207</td><td>male_age30_term35</td><td>OK</td></tr>
+<tr><td>Loading surplus下限</td><td>-300,000</td><td>97,491.860922</td><td>male_age30_term35</td><td>OK</td></tr>
+<tr><td>Loading surplus比率下限</td><td>-0.1</td><td>0.032497</td><td>male_age30_term35</td><td>OK</td></tr>
+<tr><td>NBV下限</td><td>0</td><td>62,734.828952</td><td>female_age60_term10</td><td>OK</td></tr>
+<tr><td>PTM上限</td><td>1.056</td><td>0.000447</td><td>male_age50_term20</td><td>OK</td></tr>
+          </tbody>
+        </table>
+        <h3>Management Narrative</h3>
+        <ul class="narrative-list">
+<li>結論: ハード制約は監視点を除き充足し、逸脱時トリガーを事前定義した運用に移行できます。</li>
+<li>根拠1: 最拘束制約は gamma_non_negative で、最小ギャップは 0.000000 です。</li>
+<li>根拠2: 違反件数は 0 件で、非監視・非免除点の重大逸脱はありません。</li>
+<li>根拠3: 監視点と免除点は同一管理せず、監視は警戒、免除は期限付き例外として統治します。</li>
+<li>リスク: 前提更新時にギャップが縮小する可能性があるため、しきい値近傍点は月次で再検証します。</li>
+<li>意思決定要請: 逸脱トリガー（min IRR &lt; 2.0% または max PTM &gt; 1.056）の自動再実行を継続適用してください。</li>
+        </ul>
+      </section>
+
+      <section class="slide">
+        <header class="slide-header">
+          <h2>Sensitivity and Risks</h2>
+        </header>
+        <table>
+          <thead>
+            <tr>
+              <th>Scenario</th>
+              <th>Min IRR</th>
+              <th>Min NBV</th>
+              <th>Max PTM</th>
+              <th>Violations</th>
+            </tr>
+          </thead>
+          <tbody>
+<tr><td>base</td><td>6.81%</td><td>109,852</td><td>1.0558</td><td>0</td></tr>
+<tr><td>interest_down_10pct</td><td>7.13%</td><td>121,859</td><td>1.0649</td><td>3</td></tr>
+<tr><td>interest_up_10pct</td><td>6.50%</td><td>97,915</td><td>1.0505</td><td>0</td></tr>
+<tr><td>lapse_down_10pct</td><td>7.07%</td><td>111,412</td><td>1.0558</td><td>0</td></tr>
+<tr><td>lapse_up_10pct</td><td>6.56%</td><td>108,303</td><td>1.0558</td><td>0</td></tr>
+<tr><td>expense_down_10pct</td><td>7.90%</td><td>142,396</td><td>1.0558</td><td>0</td></tr>
+<tr><td>expense_up_10pct</td><td>5.86%</td><td>77,308</td><td>1.0558</td><td>0</td></tr>
+          </tbody>
+        </table>
+        <h3>Management Narrative</h3>
+        <ul class="narrative-list">
+<li>結論: 感応度分析は支配シナリオを明示し、悪化順に対策優先度を定義できる状態です。</li>
+<li>根拠1: 最重要シナリオは interest_down_10pct で、IRR・NBV・PTM・違反件数への影響を同時評価しています。</li>
+<li>根拠2: 橋渡し分解と感応度分解を併用し、数理的な因果と経営上の対応優先度を接続しています。</li>
+<li>根拠3: 監視KPIは min IRR / min NBV / max PTM / violation_count の4指標を固定採用します。</li>
+<li>リスク: 単一ショックでは顕在化しない複合ショックが残余リスクのため、四半期ごとに再評価します。</li>
+<li>意思決定要請: 感応度上位シナリオに対するアクションプランを予め承認し、閾値到達時に即時実行してください。</li>
+        </ul>
+      </section>
+
+      <section class="slide">
+        <header class="slide-header">
+          <h2>Causal Bridge</h2>
+        </header>
+        <table>
+          <thead>
+            <tr>
+              <th>Component</th>
+              <th>Recommended</th>
+              <th>Counter</th>
+              <th>Delta</th>
+            </tr>
+          </thead>
+          <tbody>
+<tr><td>保険料収入</td><td>15,483,145</td><td>15,044,569</td><td>438,576</td></tr>
+<tr><td>利差益</td><td>5,715,198</td><td>5,701,402</td><td>13,797</td></tr>
+<tr><td>保険金等支出</td><td>-5,206,155</td><td>-5,170,371</td><td>-35,784</td></tr>
+<tr><td>事業費支出</td><td>-3,224,126</td><td>-3,222,887</td><td>-1,240</td></tr>
+<tr><td>責任準備金増減</td><td>-9,583,998</td><td>-9,583,998</td><td>0</td></tr>
+<tr><td>純キャッシュフロー</td><td>3,184,064</td><td>2,768,715</td><td>415,349</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="slide">
+        <header class="slide-header">
+          <h2>Main Slide Quality Check</h2>
+        </header>
+        <table>
+          <thead>
+            <tr>
+              <th>Slide ID</th>
+              <th>Line Count</th>
+              <th>Sections</th>
+              <th>Density</th>
+              <th>Order</th>
+            </tr>
+          </thead>
+          <tbody>
+<tr><td>executive_summary</td><td>6</td><td>true</td><td>true</td><td>true</td></tr>
+<tr><td>decision_statement</td><td>6</td><td>true</td><td>true</td><td>true</td></tr>
+<tr><td>pricing_recommendation</td><td>6</td><td>true</td><td>true</td><td>true</td></tr>
+<tr><td>constraint_status</td><td>6</td><td>true</td><td>true</td><td>true</td></tr>
+<tr><td>cashflow_bridge</td><td>6</td><td>true</td><td>true</td><td>true</td></tr>
+<tr><td>profit_source_decomposition</td><td>6</td><td>true</td><td>true</td><td>true</td></tr>
+<tr><td>sensitivity</td><td>6</td><td>true</td><td>true</td><td>true</td></tr>
+<tr><td>governance</td><td>6</td><td>true</td><td>true</td><td>true</td></tr>
+<tr><td>decision_ask</td><td>6</td><td>true</td><td>true</td><td>true</td></tr>
+          </tbody>
+        </table>
+        <p>coverage=1.000, density_ok=true, main_compare_present=true, decision_style_ok=true</p>
+      </section>
+    </main>
+  </body>
+</html>

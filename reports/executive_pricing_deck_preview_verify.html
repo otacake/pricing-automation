@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Executive Pricing Deck Preview</title>
+    <style>
+:root {
+  --color-primary: #0B5FA5;
+  --color-secondary: #5B6B7A;
+  --color-accent: #F59E0B;
+  --color-positive: #2A9D8F;
+  --color-negative: #D1495B;
+  --color-background: #F8FAFC;
+  --color-text: #111827;
+  --color-grid: #D1D5DB;
+  --font-ja: "Meiryo UI", "Meiryo", sans-serif;
+  --font-en: "Calibri", "Arial", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 24px;
+  background: linear-gradient(160deg, #f9fbff 0%, #eef3f8 100%);
+  color: var(--color-text);
+  font-family: var(--font-ja);
+}
+
+.deck {
+  display: grid;
+  gap: 16px;
+}
+
+.slide {
+  border: 1px solid var(--color-grid);
+  border-radius: 10px;
+  padding: 20px;
+  background: #ffffff;
+  box-shadow: 0 6px 24px rgba(17, 24, 39, 0.06);
+}
+
+.slide-header {
+  border-left: 5px solid var(--color-primary);
+  padding-left: 10px;
+  margin-bottom: 14px;
+}
+
+.slide h1,
+.slide h2 {
+  margin: 0;
+  font-family: var(--font-en);
+  color: var(--color-primary);
+}
+
+.headline {
+  font-size: 1.15rem;
+  margin: 8px 0 16px;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.card {
+  border: 1px solid var(--color-grid);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--color-background);
+}
+
+.card .label {
+  display: block;
+  color: var(--color-secondary);
+  font-size: 0.8rem;
+}
+
+.card .value {
+  display: block;
+  margin-top: 5px;
+  font-family: var(--font-en);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  border: 1px solid var(--color-grid);
+  padding: 7px 8px;
+  text-align: left;
+  font-size: 0.85rem;
+}
+
+th {
+  background: rgba(11, 95, 165, 0.08);
+  color: var(--color-primary);
+  font-family: var(--font-en);
+}
+
+    </style>
+  </head>
+  <body>
+    <main class="deck">
+      <section class="slide">
+        <header class="slide-header">
+          <h1>Executive Summary</h1>
+        </header>
+        <p class="headline">十分性・収益性・健全性を同時充足する価格提案</p>
+        <div class="cards">
+<article class="card"><span class="label">最小IRR</span><span class="value">6.81%</span></article>
+<article class="card"><span class="label">最小NBV</span><span class="value">JPY 62,735</span></article>
+<article class="card"><span class="label">最大PTM</span><span class="value">1.0556</span></article>
+<article class="card"><span class="label">違反件数</span><span class="value">0</span></article>
+        </div>
+      </section>
+
+      <section class="slide">
+        <header class="slide-header">
+          <h2>Pricing Recommendation</h2>
+        </header>
+        <table>
+          <thead>
+            <tr>
+              <th>Model Point</th>
+              <th>Annual P</th>
+              <th>Monthly P</th>
+              <th>IRR</th>
+              <th>NBV</th>
+              <th>PTM</th>
+            </tr>
+          </thead>
+          <tbody>
+<tr><td>female_age30_term35</td><td>88,631</td><td>7,385.9</td><td>6.97%</td><td>183,020</td><td>1.0340</td></tr>
+<tr><td>female_age40_term25</td><td>123,785</td><td>10,315.4</td><td>8.72%</td><td>248,241</td><td>1.0315</td></tr>
+<tr><td>female_age50_term20</td><td>155,615</td><td>12,967.9</td><td>9.21%</td><td>221,417</td><td>1.0374</td></tr>
+<tr><td>female_age60_term10</td><td>310,963</td><td>25,913.6</td><td>6.92%</td><td>62,735</td><td>1.0365</td></tr>
+<tr><td>male_age30_term35</td><td>89,218</td><td>7,434.8</td><td>6.81%</td><td>173,539</td><td>1.0409</td></tr>
+<tr><td>male_age40_term25</td><td>124,755</td><td>10,396.3</td><td>8.43%</td><td>232,568</td><td>1.0396</td></tr>
+<tr><td>male_age50_term20</td><td>158,333</td><td>13,194.4</td><td>8.54%</td><td>193,586</td><td>1.0556</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="slide">
+        <header class="slide-header">
+          <h2>Constraint Status</h2>
+        </header>
+        <table>
+          <thead>
+            <tr>
+              <th>Constraint</th>
+              <th>Threshold</th>
+              <th>Min Gap</th>
+              <th>Worst Model Point</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+<tr><td>alpha_non_negative</td><td>0</td><td>0.002</td><td>male_age30_term35</td><td>OK</td></tr>
+<tr><td>beta_non_negative</td><td>0</td><td>0.005</td><td>male_age30_term35</td><td>OK</td></tr>
+<tr><td>gamma_non_negative</td><td>0</td><td>0</td><td>male_age30_term35</td><td>OK</td></tr>
+<tr><td>IRR下限</td><td>0.02</td><td>0.048141</td><td>male_age30_term35</td><td>OK</td></tr>
+<tr><td>loading_positive</td><td>0</td><td>15,207</td><td>male_age30_term35</td><td>OK</td></tr>
+<tr><td>Loading surplus下限</td><td>-300,000</td><td>97,491.860922</td><td>male_age30_term35</td><td>OK</td></tr>
+<tr><td>Loading surplus比率下限</td><td>-0.1</td><td>0.032497</td><td>male_age30_term35</td><td>OK</td></tr>
+<tr><td>NBV下限</td><td>0</td><td>62,734.828952</td><td>female_age60_term10</td><td>OK</td></tr>
+<tr><td>PTM上限</td><td>1.056</td><td>0.000447</td><td>male_age50_term20</td><td>OK</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="slide">
+        <header class="slide-header">
+          <h2>Sensitivity and Risks</h2>
+        </header>
+        <table>
+          <thead>
+            <tr>
+              <th>Scenario</th>
+              <th>Min IRR</th>
+              <th>Min NBV</th>
+              <th>Max PTM</th>
+              <th>Violations</th>
+            </tr>
+          </thead>
+          <tbody>
+<tr><td>base</td><td>6.81%</td><td>109,852</td><td>1.0558</td><td>0</td></tr>
+<tr><td>interest_down_10pct</td><td>7.13%</td><td>121,859</td><td>1.0649</td><td>3</td></tr>
+<tr><td>interest_up_10pct</td><td>6.50%</td><td>97,915</td><td>1.0505</td><td>0</td></tr>
+<tr><td>lapse_down_10pct</td><td>7.07%</td><td>111,412</td><td>1.0558</td><td>0</td></tr>
+<tr><td>lapse_up_10pct</td><td>6.56%</td><td>108,303</td><td>1.0558</td><td>0</td></tr>
+<tr><td>expense_down_10pct</td><td>7.90%</td><td>142,396</td><td>1.0558</td><td>0</td></tr>
+<tr><td>expense_up_10pct</td><td>5.86%</td><td>77,308</td><td>1.0558</td><td>0</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="slide">
+        <header class="slide-header">
+          <h2>Decision Compare</h2>
+        </header>
+        <ul>
+<li>recommended objective: maximize_min_irr</li>
+<li>counter objective: penalty</li>
+<li>推奨案は制約逸脱を増やさずに最小IRR/NBVを維持する方針を採用。</li>
+<li>対向案との差分は利差益寄与とPTM上限余力のバランスで評価。</li>
+<li>許容するリスクと守るべき下限を分離して意思決定を固定化。</li>
+        </ul>
+      </section>
+
+      <section class="slide">
+        <header class="slide-header">
+          <h2>Causal Bridge</h2>
+        </header>
+        <table>
+          <thead>
+            <tr>
+              <th>Component</th>
+              <th>Recommended</th>
+              <th>Counter</th>
+              <th>Delta</th>
+            </tr>
+          </thead>
+          <tbody>
+<tr><td>保険料収入</td><td>15,483,145</td><td>15,044,569</td><td>438,576</td></tr>
+<tr><td>利差益</td><td>5,715,198</td><td>5,701,402</td><td>13,797</td></tr>
+<tr><td>保険金等支出</td><td>-5,206,155</td><td>-5,170,371</td><td>-35,784</td></tr>
+<tr><td>事業費支出</td><td>-3,224,126</td><td>-3,222,887</td><td>-1,240</td></tr>
+<tr><td>責任準備金増減</td><td>-9,583,998</td><td>-9,583,998</td><td>0</td></tr>
+<tr><td>純キャッシュフロー</td><td>3,184,064</td><td>2,768,715</td><td>415,349</td></tr>
+          </tbody>
+        </table>
+      </section>
+    </main>
+  </body>
+</html>

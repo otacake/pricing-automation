@@ -51,6 +51,7 @@ def test_build_executive_deck_spec_claims_match_run_summary() -> None:
     )
     style = load_style_contract(REPO_ROOT / "docs" / "deck_style_contract.md")
     spec = build_executive_deck_spec(
+        config={},
         config_path=REPO_ROOT / "configs" / "trial-001.yaml",
         run_summary=run_summary,
         summary_df=summary_df,
@@ -68,3 +69,8 @@ def test_build_executive_deck_spec_claims_match_run_summary() -> None:
     assert claims["min_nbv"] == run_summary["summary"]["min_nbv"]
     assert claims["max_premium_to_maturity"] == run_summary["summary"]["max_premium_to_maturity"]
     assert claims["violation_count"] == run_summary["summary"]["violation_count"]
+    assert "management_narrative" in spec
+    assert "executive_summary" in spec["management_narrative"]
+    assert "decision_statement" in spec["management_narrative"]
+    assert spec["main_slide_checks"]["coverage"] >= 1.0
+    assert spec["main_slide_checks"]["density_ok"] is True

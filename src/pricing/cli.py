@@ -479,23 +479,16 @@ def main(argv: list[str] | None = None) -> int:  # CLIのメイン処理を実�
         help="Language for chart text. Default is English to avoid font issues.",
     )
     executive_parser.add_argument(
-        "--engine",
-        type=str,
-        choices=("html_hybrid", "legacy"),
-        default="html_hybrid",
-        help="PPT generation engine. html_hybrid requires Node dependencies.",
-    )
-    executive_parser.add_argument(
         "--theme",
         type=str,
         default="consulting-clean",
-        help="Theme name for html_hybrid engine.",
+        help="Theme name for the fixed PptxGenJS deck backend.",
     )
     executive_parser.add_argument(
         "--style-contract",
         type=str,
         default="docs/deck_style_contract.md",
-        help="Path to markdown style contract used by html_hybrid engine.",
+        help="Path to markdown style contract used by the deck backend.",
     )
     executive_parser.add_argument(
         "--spec-out",
@@ -507,7 +500,7 @@ def main(argv: list[str] | None = None) -> int:  # CLIのメイン処理を実�
         "--preview-html-out",
         type=str,
         default="reports/executive_pricing_deck_preview.html",
-        help="Output HTML preview path for html_hybrid engine.",
+        help="Output HTML preview path for deck review.",
     )
     executive_parser.add_argument(
         "--quality-out",
@@ -520,6 +513,37 @@ def main(argv: list[str] | None = None) -> int:  # CLIのメイン処理を実�
         action=argparse.BooleanOptionalAction,
         default=True,
         help="Fail when quality gate is not satisfied (default: true).",
+    )
+    executive_parser.add_argument(
+        "--decision-compare",
+        type=str,
+        choices=("off", "on"),
+        default="on",
+        help="Enable dual alternative optimization/compare mode.",
+    )
+    executive_parser.add_argument(
+        "--counter-objective",
+        type=str,
+        default="maximize_min_irr",
+        help="Objective mode used for the counter alternative.",
+    )
+    executive_parser.add_argument(
+        "--explainability-strict",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Fail when explainability coverage/compare checks are missing.",
+    )
+    executive_parser.add_argument(
+        "--explain-out",
+        type=str,
+        default="out/explainability_report.json",
+        help="Output JSON path for explainability report.",
+    )
+    executive_parser.add_argument(
+        "--compare-out",
+        type=str,
+        default="out/decision_compare.json",
+        help="Output JSON path for decision compare report.",
     )
 
     cycle_parser = subparsers.add_parser(
@@ -601,13 +625,17 @@ def main(argv: list[str] | None = None) -> int:  # CLIのメイン処理を実�
             irr_threshold=float(args.irr_threshold),
             language=str(args.lang),
             chart_language=str(args.chart_lang),
-            engine=str(args.engine),
             theme=str(args.theme),
             style_contract_path=Path(args.style_contract),
             spec_out_path=Path(args.spec_out),
             preview_html_path=Path(args.preview_html_out),
             quality_out_path=Path(args.quality_out),
             strict_quality=bool(args.strict_quality),
+            decision_compare=str(args.decision_compare),
+            counter_objective=str(args.counter_objective),
+            explainability_strict=bool(args.explainability_strict),
+            explain_out_path=Path(args.explain_out),
+            compare_out_path=Path(args.compare_out),
         )
         print(f"wrote_pptx: {outputs.pptx_path}")
         print(f"wrote_markdown: {outputs.markdown_path}")
@@ -621,6 +649,10 @@ def main(argv: list[str] | None = None) -> int:  # CLIのメイン処理を実�
             print(f"wrote_preview_html: {outputs.preview_html_path}")
         if outputs.quality_path is not None:
             print(f"wrote_quality: {outputs.quality_path}")
+        if outputs.explainability_path is not None:
+            print(f"wrote_explainability: {outputs.explainability_path}")
+        if outputs.decision_compare_path is not None:
+            print(f"wrote_compare: {outputs.decision_compare_path}")
         return 0
     if args.command == "run-cycle":
         outputs = run_pdca_cycle(
@@ -648,6 +680,10 @@ def main(argv: list[str] | None = None) -> int:  # CLIのメイン処理を実�
             print(f"wrote_preview_html: {outputs.executive_preview_path}")
         if outputs.executive_quality_path is not None:
             print(f"wrote_quality: {outputs.executive_quality_path}")
+        if outputs.executive_explainability_path is not None:
+            print(f"wrote_explainability: {outputs.executive_explainability_path}")
+        if outputs.executive_compare_path is not None:
+            print(f"wrote_compare: {outputs.executive_compare_path}")
         return 0
     if args.command == "propose-change":
         if not args.set_values:

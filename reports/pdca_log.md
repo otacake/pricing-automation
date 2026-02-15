@@ -109,3 +109,31 @@
   - Rationale: governance continuity with prior runs; monitored separately even after final `violation_count=0`.
 - exempt_rationale:
   - none (exemption disabled in this cycle).
+## PDCA Cycle 20260215_050058
+- config: `C:/Users/shunsuke/pricing-automation/configs/trial-001.yaml`
+- policy: `C:/Users/shunsuke/pricing-automation/policy/pricing_policy.yaml`
+- baseline_violation_count: `6`
+- final_violation_count: `0`
+- optimization_applied: `true`
+- manifest: `C:/Users/shunsuke/pricing-automation/out/run_manifest_20260215_050058.json`
+## PDCA Cycle 20260215_053751
+- config: `C:/Users/shunsuke/pricing-automation/configs/trial-001.yaml`
+- policy: `C:/Users/shunsuke/pricing-automation/policy/pricing_policy.yaml`
+- baseline_violation_count: `6`
+- final_violation_count: `0`
+- optimization_applied: `true`
+- manifest: `C:/Users/shunsuke/pricing-automation/out/run_manifest_20260215_053751.json`
+## PDCA Cycle 20260215_054016
+- config: `C:/Users/shunsuke/pricing-automation/configs/trial-001.yaml`
+- policy: `C:/Users/shunsuke/pricing-automation/policy/pricing_policy.yaml`
+- baseline_violation_count: `6`
+- final_violation_count: `0`
+- optimization_applied: `true`
+- manifest: `C:/Users/shunsuke/pricing-automation/out/run_manifest_20260215_054016.json`
+## PDCA Cycle 20260215_131457
+- config: `C:/Users/shunsuke/pricing-automation/configs/trial-001.yaml`
+- policy: `C:/Users/shunsuke/pricing-automation/policy/pricing_policy.yaml`
+- baseline_violation_count: `6`
+- final_violation_count: `0`
+- optimization_applied: `true`
+- manifest: `C:/Users/shunsuke/pricing-automation/out/run_manifest_20260215_131457.json`

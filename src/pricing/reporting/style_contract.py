@@ -17,6 +17,7 @@ REQUIRED_COLOR_KEYS = (
     "text",
     "grid",
 )
+REQUIRED_NARRATIVE_SECTIONS = ("conclusion", "rationale", "risk", "decision_ask")
 
 
 @dataclass(frozen=True)
@@ -67,6 +68,18 @@ def _require_int(payload: Mapping[str, Any], key: str) -> int:
         return int(value)
     except (TypeError, ValueError) as exc:
         raise ValueError(f"Style contract key '{key}' must be an integer.") from exc
+
+
+def _require_str_list(payload: Mapping[str, Any], key: str) -> list[str]:
+    value = payload.get(key)
+    if not isinstance(value, list) or not value:
+        raise ValueError(f"Style contract requires list key: {key}")
+    normalized: list[str] = []
+    for item in value:
+        if not isinstance(item, str) or not item.strip():
+            raise ValueError(f"Style contract key '{key}' must contain non-empty strings.")
+        normalized.append(item.strip())
+    return normalized
 
 
 def _validate_frontmatter(frontmatter: Mapping[str, Any]) -> dict[str, Any]:
@@ -140,6 +153,41 @@ def _validate_frontmatter(frontmatter: Mapping[str, Any]) -> dict[str, Any]:
         message = _require_str(slide, "message")
         normalized_slides.append({"id": slide_id, "title": title, "message": message})
     contract["slides"] = normalized_slides
+
+    narrative = dict(_require_mapping(contract, "narrative"))
+    mode = _require_str(narrative, "mode")
+    if mode != "conclusion_first":
+        raise ValueError("Style contract narrative.mode must be 'conclusion_first'.")
+    comparison_layout = _require_str(narrative, "comparison_layout")
+    if comparison_layout != "dedicated_main_slide":
+        raise ValueError(
+            "Style contract narrative.comparison_layout must be 'dedicated_main_slide'."
+        )
+    text_density = _require_str(narrative, "text_density")
+    if text_density != "high":
+        raise ValueError("Style contract narrative.text_density must be 'high'.")
+    min_lines = _require_int(narrative, "min_lines_per_main_slide")
+    if min_lines <= 0:
+        raise ValueError("Style contract narrative.min_lines_per_main_slide must be greater than zero.")
+    required_sections = _require_str_list(narrative, "required_sections")
+    if required_sections != list(REQUIRED_NARRATIVE_SECTIONS):
+        raise ValueError(
+            "Style contract narrative.required_sections must be exactly "
+            "['conclusion', 'rationale', 'risk', 'decision_ask']."
+        )
+    compare_slide_id = _require_str(narrative, "main_compare_slide_id")
+    if compare_slide_id not in {slide["id"] for slide in normalized_slides}:
+        raise ValueError(
+            "Style contract narrative.main_compare_slide_id must match one of slides[].id."
+        )
+    contract["narrative"] = {
+        "mode": mode,
+        "comparison_layout": comparison_layout,
+        "text_density": text_density,
+        "min_lines_per_main_slide": min_lines,
+        "required_sections": required_sections,
+        "main_compare_slide_id": compare_slide_id,
+    }
 
     return contract
 

@@ -24,7 +24,9 @@ YAML設定 + CSVデータを入力にして、以下を行います。
   - 実現可能性デッキ（YAML）生成
 - `python -m pricing.cli report-executive-pptx ...`
   - `reports/feasibility_report.md` と `reports/executive_pricing_deck.pptx` を生成
-  - `html_hybrid` エンジンでは `preview.html` と `deck_spec.json` も生成
+  - PptxGenJSバックエンドで `preview.html` と `deck_spec.json` も生成
+  - 本文9枚は `結論 -> 根拠 -> リスク -> 意思決定要請` の順で固定
+  - `Decision Statement` は本文内の2案比較（推奨案/対向案）専用スライド
   - 既定は日本語出力（`--lang en` で英語に切替可）
   - グラフ文字は既定で英語（`--chart-lang en`）
 - `python -m pricing.cli run-cycle ...`
@@ -36,7 +38,7 @@ YAML設定 + CSVデータを入力にして、以下を行います。
 
 前提:
 - Python 3.11+
-- Node.js 20+（`html_hybrid` エンジン利用時）
+- Node.js 20+（PptxGenJSバックエンド利用のため必須）
 - PowerShell
 
 ### 2.1 セットアップ
@@ -69,9 +71,11 @@ python -m pricing.cli run configs\trial-001.yaml
 
 ```powershell
 python -m pricing.cli report-executive-pptx configs\trial-001.executive.optimized.yaml `
-  --engine html_hybrid `
   --theme consulting-clean `
   --style-contract docs/deck_style_contract.md `
+  --decision-compare on `
+  --counter-objective maximize_min_irr `
+  --explainability-strict `
   --lang ja --chart-lang en
 ```
 
@@ -83,7 +87,19 @@ python -m pricing.cli report-executive-pptx configs\trial-001.executive.optimize
 - `out/feasibility_deck_executive.yaml`
 - `out/executive_deck_spec.json`
 - `out/executive_deck_quality.json`
+- `out/explainability_report.json`
+- `out/decision_compare.json`
 - `out/charts/executive/*.png`
+
+`out/executive_deck_spec.json` には以下が追加されます:
+- `management_narrative`（本文9枚の説明ブロック）
+- `main_slide_checks`（行数・必須セクション・2案比較明示の判定）
+
+`out/executive_deck_quality.json` では、従来の品質判定に加えて以下を確認します:
+- `main_compare_present`（本文で2案比較が明示されているか）
+- `main_narrative_coverage`（全本文で必須セクションが揃っているか）
+- `main_narrative_density_ok`（最低行数を満たしているか）
+- `decision_style_ok`（結論先出し構造が維持されているか）
 
 またはPDCAを一括実行:
 
@@ -91,10 +107,53 @@ python -m pricing.cli report-executive-pptx configs\trial-001.executive.optimize
 python -m pricing.cli run-cycle configs\trial-001.yaml --policy policy/pricing_policy.yaml
 ```
 
+### 2.5 直近の実行サンプル（2026-02-15）
+
+実行コマンド:
+
+```powershell
+python -m pricing.cli run-cycle configs\trial-001.yaml --policy policy/pricing_policy.yaml --skip-tests
+```
+
+実行ID:
+- `20260215_131457`
+
+主要結果:
+- `baseline_violation_count: 6 -> final_violation_count: 0`
+- `optimization_applied: true`
+- `out/executive_deck_quality_20260215_131457.json: passed = true`
+- `reports/executive_pricing_deck_20260215_131457.pptx` を生成
+
+主要出力:
+- `out/run_manifest_20260215_131457.json`
+- `out/run_summary_cycle_20260215_131457.json`
+- `out/executive_deck_spec_20260215_131457.json`
+- `out/executive_deck_quality_20260215_131457.json`
+- `out/explainability_report_20260215_131457.json`
+- `out/decision_compare_20260215_131457.json`
+- `reports/feasibility_report_20260215_131457.md`
+- `reports/executive_pricing_deck_20260215_131457.pptx`
+- `reports/executive_pricing_deck_preview_20260215_131457.html`
+
 見た目を変える場合:
 
 - `docs/deck_style_contract.md` を編集（色・余白・フォント・9枚構成）
+- `narrative` ブロックで本文様式を固定（結論先出し、2案比較専用、最低6行）
 - 同じコマンドを再実行すればPPTとHTMLプレビューに反映
+
+`narrative` の必須キー:
+- `mode: conclusion_first`
+- `comparison_layout: dedicated_main_slide`
+- `text_density: high`
+- `min_lines_per_main_slide: 6`
+- `required_sections: [conclusion, rationale, risk, decision_ask]`
+- `main_compare_slide_id: decision_statement`
+
+意思決定比較・監査説明を有効化する場合（既定で有効）:
+- `--decision-compare on`
+- `--counter-objective maximize_min_irr`
+- `--explainability-strict`
+- 生成: `out/explainability_report*.json`, `out/decision_compare*.json`
 
 ---
 
@@ -159,7 +218,6 @@ python -m pricing.cli sweep-ptm configs\trial-001.yaml --all-model-points --star
 
 ```powershell
 python -m pricing.cli report-executive-pptx configs\trial-001.executive.optimized.yaml `
-  --engine html_hybrid `
   --style-contract docs/deck_style_contract.md `
   --lang ja --chart-lang en
 ```
@@ -214,13 +272,17 @@ python -m pricing.cli report-executive-pptx <config.yaml> `
   --run-summary-out out/run_summary_executive.json `
   --deck-out out/feasibility_deck_executive.yaml `
   --chart-dir out/charts/executive `
-  --engine html_hybrid `
   --theme consulting-clean `
   --style-contract docs/deck_style_contract.md `
   --spec-out out/executive_deck_spec.json `
   --preview-html-out reports/executive_pricing_deck_preview.html `
   --quality-out out/executive_deck_quality.json `
   --strict-quality `
+  --decision-compare on `
+  --counter-objective maximize_min_irr `
+  --explainability-strict `
+  --explain-out out/explainability_report.json `
+  --compare-out out/decision_compare.json `
   --lang ja `
   --chart-lang en
 ```
@@ -230,6 +292,15 @@ python -m pricing.cli report-executive-pptx <config.yaml> `
 ```powershell
 python -m pricing.cli run-cycle <config.yaml> --policy policy/pricing_policy.yaml
 ```
+
+### Breaking Change: PPTX Backend
+
+- 旧: `report-executive-pptx --engine legacy`
+- 新: `--engine` オプションは廃止。PPTX生成は常に PptxGenJS バックエンド
+- policy移行:
+  - `reporting.pptx_engine` は削除
+  - 既存policyで `pptx_engine: legacy` がある場合はエラー停止
+  - `pptx_engine: html_hybrid` は互換入力として読み飛ばされる（削除推奨）
 
 ---
 
@@ -326,8 +397,10 @@ python -m pricing.cli run-cycle <config.yaml> --policy policy/pricing_policy.yam
 |`reports/feasibility_report.md`|説明責任向け本文（式・係数・中間計算）|
 |`reports/executive_pricing_deck.pptx`|経営層向けスライド|
 |`reports/executive_pricing_deck_preview.html`|HTML/CSSプレビュー（見た目確認用）|
-|`out/executive_deck_spec.json`|PPT生成の中間仕様（trace_mapを含む）|
-|`out/executive_deck_quality.json`|品質ゲート結果（trace/editability/runtime）|
+|`out/executive_deck_spec.json`|PPT生成の中間仕様（`trace_map`、`management_narrative`、`main_slide_checks` を含む）|
+|`out/executive_deck_quality.json`|品質ゲート結果（trace/editability/runtime + explainability + main narrative checks）|
+|`out/explainability_report.json`|因果チェーン、橋渡し分解、感応度分解、Pro/Conの監査向けJSON|
+|`out/decision_compare.json`|推奨案/対向案の差分、採否理由、独立最適化の整合性判定|
 
 ---
 
@@ -336,7 +409,7 @@ python -m pricing.cli run-cycle <config.yaml> --policy policy/pricing_policy.yam
 ### Q1. `ModuleNotFoundError` が出る
 - 仮想環境を有効化して `pip install -e .` を再実行
 
-### Q1-2. `html_hybrid` で Node 関連エラーが出る
+### Q1-2. PptxGenJS で Node 関連エラーが出る
 - `npm --prefix tools/exec_deck_hybrid install` を実行
 - `node -v` でNodeがPATHにあるか確認
 
@@ -349,6 +422,11 @@ python -m pricing.cli run-cycle <config.yaml> --policy policy/pricing_policy.yam
 
 ### Q4. 実行場所によって結果が変わる
 - 現在は設定ファイル基準でパス解決するため、`cwd`依存は基本的に解消済み
+
+### Q5. `test_against_excel` が失敗する
+- 直近実行では `tests/test_against_excel.py::test_profit_test_against_excel` が1件失敗（IRR期待値差分）
+- これはPPTX生成経路ではなく、Excel比較前提との差分の可能性が高い
+- 実運用では `run_summary` / `manifest` / `quality` を監査基準にして、Excel期待値は別途キャリブレーションする
 
 ---
 
