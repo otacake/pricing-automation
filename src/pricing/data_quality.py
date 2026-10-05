@@ -117,23 +117,45 @@ def _require_columns(
     return False
 
 
+def _product_sum_assured(config: Mapping[str, object]) -> object:
+    product = config.get("product")
+    if not isinstance(product, Mapping):
+        return None
+    return product.get("sum_assured")
+
+
+def _resolved_sum_assured(entry: Mapping[str, object], default_sum_assured: object) -> float | None:
+    """Match profit_test._parse_model_points: inherit only when the key is omitted."""
+    if "sum_assured" in entry:
+        return _as_float(entry.get("sum_assured"))
+    return _as_float(default_sum_assured)
+
+
 def _validate_model_points(config: Mapping[str, object], issues: list[ValidationIssue]) -> None:
-    entries: list[object] = []
+    """Select rows the same way as profit_test._parse_model_points.
+
+    A set model_points list is the only set that is validated. The singular
+    model_point row is used only when model_points is absent.
+    """
+    labeled: list[tuple[str, object]] = []
     model_points = config.get("model_points")
-    model_point = config.get("model_point")
     if model_points is not None:
         if not isinstance(model_points, list):
             issues.append(
                 _issue("invalid_model_points_type", "model_points", "model_points must be a list.")
             )
         else:
-            entries.extend(model_points)
-    if model_point is not None:
-        entries.append(model_point)
+            labeled.extend(
+                (f"model_points[{index}]", entry) for index, entry in enumerate(model_points)
+            )
+    else:
+        model_point = config.get("model_point")
+        if model_point is not None:
+            labeled.append(("model_point", model_point))
 
+    default_sum_assured = _product_sum_assured(config)
     seen: set[str] = set()
-    for index, entry in enumerate(entries):
-        path = f"model_points[{index}]"
+    for index, (path, entry) in enumerate(labeled):
         if not isinstance(entry, Mapping):
             issues.append(
                 _issue("invalid_model_point_entry", path, "Each model point must be a mapping.")
@@ -161,7 +183,7 @@ def _validate_model_points(config: Mapping[str, object], issues: list[Validation
                 )
             else:
                 seen.add(model_id)
-        sum_assured = _as_float(entry.get("sum_assured"))
+        sum_assured = _resolved_sum_assured(entry, default_sum_assured)
         if sum_assured is None or sum_assured <= 0.0:
             issues.append(
                 _issue(

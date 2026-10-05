@@ -8,11 +8,16 @@ Order, best first:
 3. lower total gross annual premium among non-watch model points
 """
 
+import math
 from dataclasses import dataclass
 from typing import Mapping
 
 IRR_TOLERANCE = 1e-8
 PREMIUM_TOLERANCE = 1e-4
+
+
+class NonFiniteMetricsError(ValueError):
+    """Raised when the incumbent IRR or premium is not a finite number."""
 
 
 @dataclass(frozen=True)
@@ -40,18 +45,34 @@ def metrics_from_run_summary(summary: Mapping[str, object]) -> LexMetrics:
     if not active:
         active = [point for point in points if isinstance(point, Mapping)]
     irrs: list[float] = []
-    premium = 0.0
+    premiums: list[float] = []
+    finite = True
     for point in active:
         metrics = point.get("metrics")
         if not isinstance(metrics, Mapping):
             raise ValueError("model point is missing metrics.")
-        irrs.append(float(metrics["irr"]))
-        premium += float(metrics["gross_annual_premium"])
+        irr = float(metrics["irr"])
+        premium = float(metrics["gross_annual_premium"])
+        if not math.isfinite(irr) or not math.isfinite(premium):
+            finite = False
+            continue
+        irrs.append(irr)
+        premiums.append(premium)
+    if not finite:
+        return LexMetrics(
+            violation_count=int(summary_block["violation_count"]),
+            min_irr=float("nan"),
+            premium=float("nan"),
+        )
     return LexMetrics(
         violation_count=int(summary_block["violation_count"]),
         min_irr=min(irrs),
-        premium=premium,
+        premium=sum(premiums),
     )
+
+
+def _metrics_are_finite(metrics: LexMetrics) -> bool:
+    return math.isfinite(metrics.min_irr) and math.isfinite(metrics.premium)
 
 
 def compare_lexicographic(candidate: LexMetrics, incumbent: LexMetrics) -> int:
@@ -72,7 +93,17 @@ def compare_lexicographic(candidate: LexMetrics, incumbent: LexMetrics) -> int:
 
 
 def acceptance_decision(candidate: LexMetrics, incumbent: LexMetrics) -> tuple[str, str]:
-    """Return (decision, reason). decision is 'accepted' or 'rejected'."""
+    """Return (decision, reason). decision is 'accepted' or 'rejected'.
+
+    Non-finite candidate IRR or premium is rejected and is not an improvement.
+    Non-finite incumbent metrics stop the comparison.
+    """
+    if not _metrics_are_finite(incumbent):
+        raise NonFiniteMetricsError(
+            "Incumbent IRR and premium must be finite before comparison."
+        )
+    if not _metrics_are_finite(candidate):
+        return "rejected", "non_finite_metrics"
     comparison = compare_lexicographic(candidate, incumbent)
     if comparison < 0:
         return "accepted", "lexicographic_improvement"

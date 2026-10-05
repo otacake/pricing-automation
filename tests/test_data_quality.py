@@ -60,6 +60,51 @@ def test_sum_assured_must_be_positive() -> None:
     assert any(issue.code == "sum_assured_not_positive" for issue in issues)
 
 
+def test_omitted_sum_assured_inherits_product_default() -> None:
+    config = _synthetic_config()
+    for point in config["model_points"]:
+        del point["sum_assured"]
+    config["product"]["sum_assured"] = 1_000_000
+    issues = validate_input_data(config, REPO_ROOT)
+    assert not any(issue.code == "sum_assured_not_positive" for issue in issues)
+
+
+def test_omitted_sum_assured_rejects_non_positive_product_default() -> None:
+    config = _synthetic_config()
+    for point in config["model_points"]:
+        del point["sum_assured"]
+    config["product"]["sum_assured"] = 0
+    issues = validate_input_data(config, REPO_ROOT)
+    assert any(issue.code == "sum_assured_not_positive" for issue in issues)
+
+
+def test_explicit_sum_assured_does_not_inherit_product_default() -> None:
+    config = _synthetic_config()
+    config["product"]["sum_assured"] = 1_000_000
+    config["model_points"][0]["sum_assured"] = None
+    issues = validate_input_data(config, REPO_ROOT)
+    assert any(issue.code == "sum_assured_not_positive" for issue in issues)
+
+
+def test_unused_model_point_is_excluded_when_model_points_is_set() -> None:
+    config = _synthetic_config()
+    config["model_point"] = {
+        "id": None,
+        "sum_assured": 0,
+        "issue_age": 30,
+        "sex": "male",
+    }
+    issues = validate_input_data(config, REPO_ROOT)
+    codes = {issue.code for issue in issues}
+    assert "null_model_point_id" not in codes
+    assert "sum_assured_not_positive" not in codes
+
+    config["model_point"]["id"] = config["model_points"][0]["id"]
+    config["model_point"]["sum_assured"] = 1
+    issues = validate_input_data(config, REPO_ROOT)
+    assert not any(issue.code == "duplicate_model_point_id" for issue in issues)
+
+
 def test_missing_mortality_column_fails(tmp_path: Path) -> None:
     frame = pd.read_csv(REPO_ROOT / "tests" / "fixtures" / "data" / "mortality_pricing.csv")
     frame = frame.drop(columns=["q_female"])
