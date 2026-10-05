@@ -20,7 +20,7 @@ from pricing.cli import pdca_loop_from_config
 from pricing.endowment import LoadingFunctionParams
 from pricing.ledger import input_config_sha256, stable_config_sha256
 from pricing.optimize import OptimizationResult
-from pricing.pdca_loop import run_pdca_loop
+from pricing.pdca_loop import record_token, run_pdca_loop
 from pricing.profit_test import ProfitTestBatchResult
 from tests.data_paths import apply_fixture_inputs
 
@@ -406,6 +406,108 @@ def test_data_failure_command_output_keeps_exit_code(
     assert "stop_reason: failed" in captured
     assert "gate_passed: null" in captured
     assert "success does not mean the gate passed" in captured
+
+
+def _assert_recorded_gate(
+    *,
+    manifest: dict,
+    log_text: str,
+    outcome: dict,
+    captured: str,
+    gate_passed: bool | None,
+    final_violation_count: int | None,
+    stop_reason: str,
+) -> None:
+    gate_token = record_token(gate_passed)
+    count_token = record_token(final_violation_count)
+    assert manifest["status"] == "failed"
+    assert manifest["stop_reason"] == stop_reason
+    assert manifest["gate_passed"] is gate_passed
+    assert manifest["final_violation_count"] is final_violation_count
+    assert outcome["stop_reason"] == stop_reason
+    assert outcome["gate_passed"] is gate_passed
+    assert outcome["final_violation_count"] is final_violation_count
+    for text in (log_text, captured):
+        assert f"stop_reason: {stop_reason}" in text
+        assert f"gate_passed: {gate_token}" in text
+        assert f"final_violation_count: {count_token}" in text
+
+
+@pytest.mark.parametrize(
+    ("min_irr", "premium"),
+    [
+        (float("nan"), 100.0),
+        (0.05, float("inf")),
+        (float("-inf"), 100.0),
+    ],
+)
+def test_non_finite_initial_incumbent_leaves_gate_unevaluated(
+    tmp_path: Path,
+    monkeypatch,
+    capsys: pytest.CaptureFixture[str],
+    min_irr: float,
+    premium: float,
+) -> None:
+    _script_metrics(monkeypatch, [LexMetrics(0, min_irr, premium)])
+    code = pdca_loop_from_config(
+        _config_path(tmp_path),
+        policy_path=_policy_path(tmp_path, max_violation_count=0),
+        max_iterations=2,
+    )
+    captured = capsys.readouterr().out
+    assert code == 1
+    manifest_path = Path(captured.rsplit("manifest=", 1)[1].strip())
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    log_text = Path(manifest["outputs"]["result_log_path"]).read_text(encoding="utf-8")
+    _assert_recorded_gate(
+        manifest=manifest,
+        log_text=log_text,
+        outcome=_outcome(_ledger(tmp_path)),
+        captured=captured,
+        gate_passed=None,
+        final_violation_count=None,
+        stop_reason="failed",
+    )
+    assert manifest["failed_stage"] == "incumbent_run"
+    assert manifest["champion_metrics"] == {}
+    assert manifest["iterations_run"] == 0
+    assert manifest["gate_max_violation_count"] == 0
+
+
+def test_optimize_failure_keeps_valid_incumbent_gate(
+    tmp_path: Path,
+    monkeypatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    def boom(*_args, **_kwargs):
+        raise RuntimeError("optimizer exploded")
+
+    _script_metrics(monkeypatch, [LexMetrics(0, 0.05, 100.0)])
+    monkeypatch.setattr(loop_mod, "optimize_loading_parameters", boom)
+    code = pdca_loop_from_config(
+        _config_path(tmp_path),
+        policy_path=_policy_path(tmp_path, max_violation_count=0),
+        max_iterations=2,
+    )
+    captured = capsys.readouterr().out
+    assert code == 1
+    manifest_path = Path(captured.rsplit("manifest=", 1)[1].strip())
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    log_text = Path(manifest["outputs"]["result_log_path"]).read_text(encoding="utf-8")
+    _assert_recorded_gate(
+        manifest=manifest,
+        log_text=log_text,
+        outcome=_outcome(_ledger(tmp_path)),
+        captured=captured,
+        gate_passed=True,
+        final_violation_count=0,
+        stop_reason="failed",
+    )
+    assert manifest["failed_stage"] == "optimize_1"
+    assert manifest["champion_metrics"]["violation_count"] == 0
+    assert manifest["champion_metrics"]["min_irr"] == 0.05
+    assert manifest["champion_metrics"]["premium"] == 100.0
+    assert manifest["gate_passed"] is not None
 
 
 def test_loop_records_separate_input_config_hash(tmp_path: Path, monkeypatch) -> None:

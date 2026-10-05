@@ -22,7 +22,7 @@ from typing import Any, Mapping
 import numpy as np
 import yaml
 
-from .acceptance import acceptance_decision, metrics_from_run_summary
+from .acceptance import NonFiniteMetricsError, acceptance_decision, metrics_from_run_summary
 from .data_quality import raise_if_data_invalid
 from .diagnostics import build_run_summary
 from .ledger import (
@@ -266,6 +266,12 @@ def run_pdca_loop(
             source="pdca_loop_incumbent",
         )
         champion_metrics_obj = metrics_from_run_summary(champion_summary)
+        if not math.isfinite(champion_metrics_obj.min_irr) or not math.isfinite(
+            champion_metrics_obj.premium
+        ):
+            raise NonFiniteMetricsError(
+                "Incumbent IRR and premium must be finite before comparison."
+            )
         champion_metrics = champion_metrics_obj.as_dict()
         champion_config_sha = stable_config_sha256(champion_config)
         champion_input_sha = input_config_sha256(champion_config)
