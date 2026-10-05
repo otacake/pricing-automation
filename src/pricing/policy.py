@@ -54,10 +54,36 @@ class ReportPolicy:
 
 
 @dataclass(frozen=True)
+class LoopPolicy:
+    max_iterations: int
+    random_seed: int
+
+
+@dataclass(frozen=True)
+class AcceptancePolicy:
+    """Only objective=maximize_min_irr and tie_break=lower_premium are supported.
+
+    Other values are rejected when the policy is loaded. They are not ignored,
+    and there is no runtime switch to another acceptance criterion.
+    """
+
+    objective: str
+    tie_break: str
+
+
+@dataclass(frozen=True)
+class LedgerPolicy:
+    path: str
+
+
+@dataclass(frozen=True)
 class AutoCyclePolicy:
     gate: GatePolicy
     feasibility: FeasibilitySweepPolicy
     reporting: ReportPolicy
+    loop: LoopPolicy
+    acceptance: AcceptancePolicy
+    ledger: LedgerPolicy
 
 
 def _as_mapping(raw: object) -> Mapping[str, object]:
@@ -118,6 +144,27 @@ def load_auto_cycle_policy(path: Path) -> AutoCyclePolicy:
         raise ValueError("reporting.decision_compare.counter_objective must not be empty.")
 
     explainability_cfg = _as_mapping(reporting_cfg.get("explainability"))
+    loop_cfg = _as_mapping(root.get("loop"))
+    acceptance_cfg = _as_mapping(root.get("acceptance"))
+    ledger_cfg = _as_mapping(root.get("ledger"))
+
+    max_iterations = int(loop_cfg.get("max_iterations", 3))
+    if max_iterations < 1:
+        raise ValueError("loop.max_iterations must be >= 1.")
+    objective = str(acceptance_cfg.get("objective", "maximize_min_irr")).strip()
+    tie_break = str(acceptance_cfg.get("tie_break", "lower_premium")).strip()
+    supported = (
+        "Only acceptance.objective='maximize_min_irr' with "
+        "acceptance.tie_break='lower_premium' is supported. "
+        "Other acceptance settings are rejected and are not ignored."
+    )
+    if objective != "maximize_min_irr":
+        raise ValueError(f"{supported} Got acceptance.objective={objective!r}.")
+    if tie_break != "lower_premium":
+        raise ValueError(f"{supported} Got acceptance.tie_break={tie_break!r}.")
+    ledger_path = str(ledger_cfg.get("path", "out/pdca_ledger.jsonl")).strip()
+    if not ledger_path:
+        raise ValueError("ledger.path must not be empty.")
 
     return AutoCyclePolicy(
         gate=GatePolicy(
@@ -152,4 +199,13 @@ def load_auto_cycle_policy(path: Path) -> AutoCyclePolicy:
                 ),
             ),
         ),
+        loop=LoopPolicy(
+            max_iterations=max_iterations,
+            random_seed=int(loop_cfg.get("random_seed", 20261005)),
+        ),
+        acceptance=AcceptancePolicy(
+            objective=objective,
+            tie_break=tie_break,
+        ),
+        ledger=LedgerPolicy(path=ledger_path),
     )

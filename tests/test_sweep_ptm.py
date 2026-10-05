@@ -11,12 +11,13 @@ SRC_ROOT = REPO_ROOT / "src"  # src配下をモジュール探索対象にする
 if str(SRC_ROOT) not in sys.path:  # まだ追加されていない場合
     sys.path.insert(0, str(SRC_ROOT))  # 先頭に追加して優先度を上げる
 
+from tests.data_paths import apply_fixture_inputs
 from pricing.sweep_ptm import load_model_points, sweep_premium_to_maturity, sweep_premium_to_maturity_all  # 対象関数をテストするため
 
 
 def test_sweep_ptm_outputs_rows_and_no_nan(tmp_path: Path) -> None:  # 単一モデルポイントのスイープ結果を検証する
     config_path = REPO_ROOT / "configs" / "trial-001.yaml"  # テスト用設定パス
-    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))  # 設定を読み込む
+    config = apply_fixture_inputs(yaml.safe_load(config_path.read_text(encoding="utf-8")))  # 設定を読み込む
 
     label = "male_age30_term35"  # 対象モデルポイントのラベル
     start = 1.0  # スイープ開始値
@@ -48,7 +49,7 @@ def test_sweep_ptm_outputs_rows_and_no_nan(tmp_path: Path) -> None:  # 単一モ
 
 def test_sweep_ptm_invalid_model_point() -> None:  # 不正なモデルポイント指定時の挙動を検証する
     config_path = REPO_ROOT / "configs" / "trial-001.yaml"  # テスト用設定パス
-    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))  # 設定を読み込む
+    config = apply_fixture_inputs(yaml.safe_load(config_path.read_text(encoding="utf-8")))  # 設定を読み込む
 
     with pytest.raises(ValueError):  # ValueErrorが発生することを期待する
         sweep_premium_to_maturity(  # 存在しないモデルポイントで実行する
@@ -65,7 +66,7 @@ def test_sweep_ptm_invalid_model_point() -> None:  # 不正なモデルポイン
 
 def test_sweep_ptm_all_model_points_rows(tmp_path: Path) -> None:  # 全モデルポイントのスイープ行数を検証する
     config_path = REPO_ROOT / "configs" / "trial-001.yaml"  # テスト用設定パス
-    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))  # 設定を読み込む
+    config = apply_fixture_inputs(yaml.safe_load(config_path.read_text(encoding="utf-8")))  # 設定を読み込む
     points = load_model_points(config)  # モデルポイント一覧を取得する
 
     out_path = tmp_path / "all.csv"  # 出力先の一時パス
@@ -88,7 +89,7 @@ def test_sweep_ptm_all_model_points_rows(tmp_path: Path) -> None:  # 全モデ�
 
 def test_sweep_ptm_all_model_points_not_found(tmp_path: Path) -> None:  # 最小rが見つからない条件を検証する
     config_path = REPO_ROOT / "configs" / "trial-001.yaml"  # テスト用設定パス
-    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))  # 設定を読み込む
+    config = apply_fixture_inputs(yaml.safe_load(config_path.read_text(encoding="utf-8")))  # 設定を読み込む
 
     out_path = tmp_path / "all.csv"  # 出力先の一時パス
     _, min_r_by_id = sweep_premium_to_maturity_all(  # 条件を厳しくして実行する
@@ -109,7 +110,7 @@ def test_sweep_ptm_all_model_points_not_found(tmp_path: Path) -> None:  # 最小
 
 def test_sweep_ptm_supports_loading_parameters_only(tmp_path: Path) -> None:
     config_path = REPO_ROOT / "configs" / "trial-001.optimized.yaml"
-    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    config = apply_fixture_inputs(yaml.safe_load(config_path.read_text(encoding="utf-8")))
     config.pop("loading_alpha_beta_gamma", None)
 
     out_path = tmp_path / "all_loading_parameters.csv"

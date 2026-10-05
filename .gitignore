@@ -18,6 +18,8 @@ data/
 !data/README.md
 !data/golden/
 !data/golden/README.md
+!tests/fixtures/data/
+!tests/fixtures/data/**
 
 # Excel / Office
 *.xlsx

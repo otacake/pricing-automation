@@ -37,7 +37,7 @@ def test_cli_report_feasibility_writes_output(tmp_path: Path) -> None:
     completed = _run_cli(
         [
             "report-feasibility",
-            "configs/trial-001.yaml",
+            "configs/trial-001.synthetic.yaml",
             "--r-start",
             "1.0",
             "--r-end",
@@ -55,6 +55,7 @@ def test_cli_report_feasibility_writes_output(tmp_path: Path) -> None:
     assert out_path.exists()
 
 
+@pytest.mark.real_data
 def test_cli_report_executive_pptx_writes_outputs(tmp_path: Path) -> None:
     pytest.importorskip("matplotlib")
     if not _pptxgenjs_ready():
@@ -114,6 +115,7 @@ def test_cli_report_executive_pptx_writes_outputs(tmp_path: Path) -> None:
     assert (chart_dir / "annual_premium_by_model_point.png").exists()
 
 
+@pytest.mark.real_data
 def test_cli_report_executive_pptx_writes_outputs_with_spec_and_quality(tmp_path: Path) -> None:
     pytest.importorskip("matplotlib")
     if not _pptxgenjs_ready():

@@ -211,6 +211,14 @@ def write_optimize_log(  # 最適化結果をテキストで出力する
         f"g_term: {result.params.g_term}",  # gamma期間
     ]  # ログヘッダーここまで
 
+    for hypothesis in result.approval_hypotheses:
+        lines.append(
+            "approval_required_hypothesis: "
+            f"id={hypothesis.get('hypothesis_id', 'n/a')} applied=false "
+            f"changes={hypothesis.get('changes', [])} "
+            f"reason={hypothesis.get('reason', 'n/a')}"
+        )
+
     if result.proposal:  # 条件付き成功の提案がある場合
         changes = result.proposal.get("changes", [])
         change_labels = []

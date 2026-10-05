@@ -1,6 +1,19 @@
 gate:
   max_violation_count: 0
 
+loop:
+  max_iterations: 3
+  random_seed: 20261005
+
+acceptance:
+  # Supported pair only: maximize_min_irr with tie_break lower_premium.
+  # Any other objective or tie_break is rejected at load and is not ignored.
+  objective: maximize_min_irr
+  tie_break: lower_premium
+
+ledger:
+  path: out/pdca_ledger.jsonl
+
 feasibility:
   enabled: true
   r_start: 1.0
