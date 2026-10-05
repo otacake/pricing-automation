@@ -2,6 +2,10 @@ from __future__ import annotations
 
 """Lexicographic no-regression guard for pricing candidates.
 
+The only supported policy pair is objective=maximize_min_irr and
+tie_break=lower_premium. load_auto_cycle_policy rejects every other pair.
+There is no switch to another criterion.
+
 Order, best first:
 1. fewer hard-constraint violations (zero first)
 2. higher minimum IRR among non-watch model points

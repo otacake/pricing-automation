@@ -4,18 +4,20 @@ from __future__ import annotations
 
 Each iteration optimizes loading parameters on the incumbent config.
 A candidate replaces the incumbent only when the lexicographic guard accepts
-it. The loop stops when a candidate is not an improvement, or when
-loop.max_iterations is reached. Every trial is appended to the ledger.
+it. The loop stops when a candidate is rejected, or when loop.max_iterations
+is reached. status=success means the loop finished; it does not mean the
+violation gate passed. Every trial is appended to the ledger.
 """
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import hashlib
 import json
+import math
 from pathlib import Path
 import random
 import sys
-from typing import Any
+from typing import Any, Mapping
 
 import numpy as np
 import yaml
@@ -24,7 +26,9 @@ from .acceptance import acceptance_decision, metrics_from_run_summary
 from .data_quality import raise_if_data_invalid
 from .diagnostics import build_run_summary
 from .ledger import (
+    INPUT_CONFIG_HASH_COVERS,
     append_ledger_record,
+    input_config_sha256,
     record_approval_hypotheses,
     resolve_ledger_path,
     stable_config_sha256,
@@ -50,6 +54,9 @@ class PDCALoopOutputs:
     ledger_path: Path
     iterations_run: int
     champion_metrics: dict[str, float]
+    gate_passed: bool | None
+    final_violation_count: int | None
+    gate_max_violation_count: int | None
 
 
 def _sha256_file(path: Path) -> str | None:
@@ -86,6 +93,50 @@ def _validate_or_raise(config: dict, *, context: str) -> None:
 def _write_result_log(path: Path, lines: list[str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+EXECUTION_NOTE = (
+    "status is the execution outcome; success does not mean the gate passed"
+)
+
+
+def record_token(value: object) -> str:
+    """Render None and bool so logs match JSON null/true/false."""
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return str(value)
+
+
+def _violation_count(metrics: Mapping[str, object]) -> int | None:
+    if not metrics:
+        return None
+    raw = metrics.get("violation_count")
+    if raw is None or isinstance(raw, bool):
+        return None
+    try:
+        number = float(raw)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(number) or not number.is_integer():
+        return None
+    return int(number)
+
+
+def evaluate_gate(
+    metrics: Mapping[str, object],
+    threshold: int | None,
+) -> tuple[bool | None, int | None, int | None]:
+    """Compare the final violation count with the policy threshold.
+
+    Missing metrics or a missing threshold leave gate_passed as None.
+    None is not a pass.
+    """
+    count = _violation_count(metrics)
+    if count is None or threshold is None:
+        return None, count, threshold
+    return count <= threshold, count, threshold
 
 
 def _loading_changes(config: dict) -> list[dict[str, object]]:
@@ -158,7 +209,7 @@ def run_pdca_loop(
     ]
 
     status = "success"
-    stop_reason = "no_improvement"
+    stop_reason = "max_iterations"
     failure_class: str | None = None
     error_message: str | None = None
     caught: BaseException | None = None
@@ -166,10 +217,13 @@ def run_pdca_loop(
     iterations_run = 0
     champion_metrics: dict[str, float] = {}
     champion_config_sha: str | None = None
+    champion_input_sha: str | None = None
+    gate_threshold: int | None = None
 
     try:
         stage = "load_policy"
         policy: AutoCyclePolicy = load_auto_cycle_policy(policy_file)
+        gate_threshold = policy.gate.max_violation_count
         if max_iterations is None:
             iteration_cap = policy.loop.max_iterations
         seed = policy.loop.random_seed
@@ -214,6 +268,7 @@ def run_pdca_loop(
         champion_metrics_obj = metrics_from_run_summary(champion_summary)
         champion_metrics = champion_metrics_obj.as_dict()
         champion_config_sha = stable_config_sha256(champion_config)
+        champion_input_sha = input_config_sha256(champion_config)
         (loop_dir / "champion_initial.yaml").write_text(
             yaml.safe_dump(champion_config, allow_unicode=True, sort_keys=False),
             encoding="utf-8",
@@ -240,6 +295,7 @@ def run_pdca_loop(
                 iteration=iteration,
                 seed=seed,
                 config_sha256=champion_config_sha,
+                input_config_hash=champion_input_sha,
             )
             for hypothesis in optimize_result.approval_hypotheses:
                 log_lines.append(
@@ -262,6 +318,8 @@ def run_pdca_loop(
             candidate_metrics = metrics_from_run_summary(candidate_summary)
             decision, reason = acceptance_decision(candidate_metrics, champion_metrics_obj)
             candidate_sha = stable_config_sha256(candidate_config)
+            candidate_input_sha = input_config_sha256(candidate_config)
+            trial_stop_reason = reason if decision != "accepted" else None
             append_ledger_record(
                 ledger_path,
                 {
@@ -272,9 +330,13 @@ def run_pdca_loop(
                     "change_class": "auto_allowed",
                     "decision": decision,
                     "reason": reason,
+                    "stop_reason": trial_stop_reason,
                     "applied": decision == "accepted",
                     "seed": seed,
                     "config_sha256": candidate_sha,
+                    "input_config_sha256": candidate_input_sha,
+                    "incumbent_input_config_sha256": champion_input_sha,
+                    "input_config_sha256_covers": INPUT_CONFIG_HASH_COVERS,
                     "incumbent_metrics": champion_metrics_obj.as_dict(),
                     "candidate_metrics": candidate_metrics.as_dict(),
                     "changes": _loading_changes(candidate_config),
@@ -282,15 +344,19 @@ def run_pdca_loop(
             )
             log_lines.append(
                 f"trial iteration={iteration} decision={decision} reason={reason} "
-                f"metrics={candidate_metrics.as_dict()} config_sha256={candidate_sha}"
+                f"stop_reason={record_token(trial_stop_reason)} "
+                f"metrics={candidate_metrics.as_dict()} config_sha256={candidate_sha} "
+                f"input_config_sha256={candidate_input_sha} "
+                f"incumbent_input_config_sha256={champion_input_sha}"
             )
             if decision != "accepted":
-                stop_reason = "no_improvement"
+                stop_reason = reason
                 break
             champion_config = candidate_config
             champion_metrics_obj = candidate_metrics
             champion_metrics = candidate_metrics.as_dict()
             champion_config_sha = candidate_sha
+            champion_input_sha = candidate_input_sha
             (loop_dir / "champion.yaml").write_text(
                 candidate_path.read_text(encoding="utf-8"),
                 encoding="utf-8",
@@ -303,9 +369,7 @@ def run_pdca_loop(
                 yaml.safe_dump(champion_config, allow_unicode=True, sort_keys=False),
                 encoding="utf-8",
             )
-        log_lines.append(f"stop_reason: {stop_reason}")
         log_lines.append(f"champion: {champion_metrics}")
-        log_lines.append(f"champion_config_sha256: {champion_config_sha}")
     except Exception as exc:  # noqa: BLE001 - failed loops must still leave a manifest
         status = "failed"
         stop_reason = "failed"
@@ -321,14 +385,58 @@ def run_pdca_loop(
             ]
         )
 
-    if "status: failed" not in log_lines and status == "success":
-        log_lines.insert(1, "status: success")
+    gate_passed, final_violation_count, gate_max_violation_count = evaluate_gate(
+        champion_metrics,
+        gate_threshold,
+    )
+    try:
+        append_ledger_record(
+            ledger_path,
+            {
+                "loop_id": loop_id,
+                "source": "pdca_loop",
+                "record_type": "loop_outcome",
+                "decision": "stopped",
+                "reason": stop_reason,
+                "stop_reason": stop_reason,
+                "status": status,
+                "applied": False,
+                "seed": seed,
+                "iterations_run": iterations_run,
+                "config_sha256": champion_config_sha,
+                "input_config_sha256": champion_input_sha,
+                "input_config_sha256_covers": INPUT_CONFIG_HASH_COVERS,
+                "gate_passed": gate_passed,
+                "final_violation_count": final_violation_count,
+                "gate_max_violation_count": gate_max_violation_count,
+            },
+        )
+    except Exception:
+        if caught is None:
+            raise
+
+    status_line = f"status: {status}"
+    if status_line not in log_lines:
+        log_lines.insert(1, status_line)
+    status_at = log_lines.index(status_line)
+    log_lines.insert(status_at + 1, f"execution_note: {EXECUTION_NOTE}")
+    log_lines.append(f"stop_reason: {stop_reason}")
+    log_lines.append(f"gate_passed: {record_token(gate_passed)}")
+    log_lines.append(f"final_violation_count: {record_token(final_violation_count)}")
+    log_lines.append(f"gate_max_violation_count: {record_token(gate_max_violation_count)}")
+    log_lines.append(f"champion_config_sha256: {champion_config_sha}")
+    log_lines.append(f"input_config_sha256: {champion_input_sha}")
+    log_lines.append(f"input_config_sha256_covers: {INPUT_CONFIG_HASH_COVERS}")
     _write_result_log(result_log_path, log_lines)
     manifest = {
         "run_id": loop_id,
         "kind": "pdca_loop",
         "status": status,
+        "status_meaning": EXECUTION_NOTE,
         "stop_reason": stop_reason,
+        "gate_passed": gate_passed,
+        "final_violation_count": final_violation_count,
+        "gate_max_violation_count": gate_max_violation_count,
         "failed_stage": stage if status == "failed" else None,
         "failure_class": failure_class,
         "error": error_message,
@@ -345,6 +453,8 @@ def run_pdca_loop(
             "sha256": _sha256_file(policy_file),
         },
         "champion_config_sha256": champion_config_sha,
+        "input_config_sha256": champion_input_sha,
+        "input_config_sha256_covers": INPUT_CONFIG_HASH_COVERS,
         "champion_metrics": champion_metrics,
         "commands": commands,
         "outputs": {
@@ -356,11 +466,17 @@ def run_pdca_loop(
     manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=True), encoding="utf-8")
 
     if caught is not None:
+        print(f"status: {status}")
+        print(f"execution_note: {EXECUTION_NOTE}")
+        print(f"stop_reason: {stop_reason}")
+        print(f"gate_passed: {record_token(gate_passed)}")
+        print(f"final_violation_count: {record_token(final_violation_count)}")
+        print(f"gate_max_violation_count: {record_token(gate_max_violation_count)}")
         print(f"wrote_manifest: {manifest_path}")
         print(f"wrote_result_log: {result_log_path}")
         raise RuntimeError(
             f"PDCA loop failed ({failure_class}) at {stage}: {error_message}. "
-            f"manifest={manifest_path}"
+            f"stop_reason={stop_reason} manifest={manifest_path}"
         ) from caught
 
     return PDCALoopOutputs(
@@ -372,4 +488,7 @@ def run_pdca_loop(
         ledger_path=ledger_path,
         iterations_run=iterations_run,
         champion_metrics=champion_metrics,
+        gate_passed=gate_passed,
+        final_violation_count=final_violation_count,
+        gate_max_violation_count=gate_max_violation_count,
     )

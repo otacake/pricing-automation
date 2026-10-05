@@ -20,7 +20,9 @@ from .acceptance import acceptance_decision, metrics_from_run_summary
 from .data_quality import raise_if_data_invalid
 from .diagnostics import build_execution_context, build_run_summary
 from .ledger import (
+    INPUT_CONFIG_HASH_COVERS,
     append_ledger_record,
+    input_config_sha256,
     record_approval_hypotheses,
     resolve_ledger_path,
     stable_config_sha256,
@@ -229,6 +231,7 @@ def run_pdca_cycle(
     error_message: str | None = None
     caught: BaseException | None = None
 
+    active_config: dict | None = None
     baseline_violation_count: int | None = None
     final_violation_count: int | None = None
     optimization_attempted = False
@@ -340,6 +343,7 @@ def run_pdca_cycle(
                 iteration=1,
                 seed=seed,
                 config_sha256=stable_config_sha256(config),
+                input_config_hash=input_config_sha256(config),
             )
             evaluated_config_path = out_dir / f"{config_path.stem}.candidate_{run_id}.yaml"
             write_optimized_config(config, optimize_result, evaluated_config_path)
@@ -375,6 +379,9 @@ def run_pdca_cycle(
                     "applied": decision == "accepted",
                     "seed": seed,
                     "config_sha256": stable_config_sha256(candidate_config),
+                    "input_config_sha256": input_config_sha256(candidate_config),
+                    "incumbent_input_config_sha256": input_config_sha256(config),
+                    "input_config_sha256_covers": INPUT_CONFIG_HASH_COVERS,
                     "incumbent_metrics": incumbent_metrics.as_dict(),
                     "candidate_metrics": candidate_metrics.as_dict(),
                     "changes": [{"path": "loading_parameters"}],
@@ -526,6 +533,10 @@ def run_pdca_cycle(
             "path": str(policy_file),
             "sha256": _sha256_file(policy_file),
         },
+        "input_config_sha256": (
+            input_config_sha256(active_config) if isinstance(active_config, dict) else None
+        ),
+        "input_config_sha256_covers": INPUT_CONFIG_HASH_COVERS,
         "commands": commands,
         "metrics": {
             "baseline_violation_count": baseline_violation_count,

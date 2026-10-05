@@ -54,6 +54,24 @@ def test_repo_policy_file_is_loadable() -> None:
     assert policy.acceptance.objective == "maximize_min_irr"
 
 
+@pytest.mark.parametrize(
+    "acceptance",
+    [
+        {"objective": "minimize_premium", "tie_break": "lower_premium"},
+        {"objective": "maximize_min_irr", "tie_break": "higher_premium"},
+        {"objective": "minimize_premium", "tie_break": "higher_premium"},
+    ],
+)
+def test_unsupported_acceptance_settings_are_rejected(tmp_path: Path, acceptance: dict) -> None:
+    policy_path = tmp_path / "policy.yaml"
+    policy_path.write_text(
+        yaml.safe_dump({"acceptance": acceptance}, sort_keys=False),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="not ignored"):
+        load_auto_cycle_policy(policy_path)
+
+
 def test_load_auto_cycle_policy_rejects_legacy_engine(tmp_path: Path) -> None:
     policy_payload = {
         "reporting": {

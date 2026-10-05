@@ -14,7 +14,7 @@ import yaml  # YAML設定を読み込むため
 from .config import load_optimization_settings, loading_surplus_threshold, read_loading_parameters  # 設定値の解釈に使うため
 from .diagnostics import build_execution_context, build_run_summary  # 構造化診断に使うため
 from .data_quality import validate_input_data
-from .ledger import record_approval_hypotheses, stable_config_sha256
+from .ledger import input_config_sha256, record_approval_hypotheses, stable_config_sha256
 from .optimize import optimize_loading_parameters, write_optimized_config  # 最適化の実行と結果保存に使うため
 from .pdca_loop import run_pdca_loop
 from .outputs import (  # 出力ファイル生成に使うため
@@ -236,6 +236,7 @@ def optimize_from_config(config_path: Path) -> int:  # YAML設定を使って最
             iteration=0,
             seed=None,
             config_sha256=stable_config_sha256(config),
+            input_config_hash=input_config_sha256(config),
         )
 
     outputs_cfg = config.get("outputs", {})  # 出力設定を取得する
@@ -433,6 +434,14 @@ def validate_data_from_config(config_path: Path) -> int:
     return 0
 
 
+def _record_token(value: object) -> str:
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return str(value)
+
+
 def pdca_loop_from_config(
     config_path: Path,
     *,
@@ -451,7 +460,14 @@ def pdca_loop_from_config(
     print("pdca_loop")
     print(f"loop_id: {outputs.loop_id}")
     print(f"status: {outputs.status}")
+    print(
+        "execution_note: status is the execution outcome; "
+        "success does not mean the gate passed"
+    )
     print(f"stop_reason: {outputs.stop_reason}")
+    print(f"gate_passed: {_record_token(outputs.gate_passed)}")
+    print(f"final_violation_count: {_record_token(outputs.final_violation_count)}")
+    print(f"gate_max_violation_count: {_record_token(outputs.gate_max_violation_count)}")
     print(f"iterations_run: {outputs.iterations_run}")
     print(f"champion_metrics: {outputs.champion_metrics}")
     print(f"wrote_manifest: {outputs.manifest_path}")
