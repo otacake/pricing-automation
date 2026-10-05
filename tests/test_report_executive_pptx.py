@@ -28,6 +28,7 @@ def test_require_node_runtime_reports_backend_name(monkeypatch: pytest.MonkeyPat
         executive_pptx._require_node_runtime()
 
 
+@pytest.mark.real_data
 def test_report_executive_pptx_generates_outputs_with_pptxgenjs_backend(tmp_path: Path) -> None:
     pytest.importorskip("matplotlib")
     if not _pptxgenjs_ready():

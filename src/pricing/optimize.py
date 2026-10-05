@@ -53,7 +53,8 @@ class OptimizationResult:  # 最適化の結果をまとめる
     - watch_model_points: model point IDs excluded from objective/constraints
     - min_irr: minimum IRR among evaluated model points
     - min_irr_model_point: model point ID that attains min_irr
-    - proposal: conditional success proposal (if any)
+    - proposal: legacy field, no longer populated by the search
+    - approval_hypotheses: unapplied approval-required ideas (not executed)
     """
 
     params: LoadingFunctionParams  # 最適化後の係数
@@ -67,6 +68,7 @@ class OptimizationResult:  # 最適化の結果をまとめる
     min_irr: float  # 最小IRR
     min_irr_model_point: str | None  # 最小IRRのモデルポイント
     proposal: dict[str, object] | None = None  # 条件付き成功の提案
+    approval_hypotheses: tuple[dict[str, object], ...] = ()  # 未適用の承認待ち仮説
 
 
 @dataclass(frozen=True)  # 候補評価結果を不変で保持するため
@@ -277,20 +279,46 @@ def _clamp_params(  # 係数を探索範囲内に収める
     return updated  # 調整後の係数を返す
 
 
-def _apply_config_change(  # 設定の一部を更新する
-    config: dict,  # 対象設定
-    dotted_key: str,  # ドット区切りのキー
-    value: object,  # 設定値
-) -> None:  # 更新のみ行う
-    keys = [part for part in dotted_key.split(".") if part]
-    if not keys:
-        raise ValueError("Invalid config key.")
-    cursor = config
-    for key in keys[:-1]:
-        if key not in cursor or not isinstance(cursor[key], dict):
-            cursor[key] = {}
-        cursor = cursor[key]
-    cursor[keys[-1]] = value
+def _approval_required_hypotheses(config: dict) -> tuple[dict[str, object], ...]:
+    """Hypotheses that used to be applied silently and are now approval-only.
+
+    These changes are not executed. The returned search result uses the input
+    config only, so a written config matches the run.
+    """
+    settings = load_optimization_settings(config)
+    lowered_target = max(float(settings.irr_target) - 0.01, 0.0)
+    return (
+        {
+            "hypothesis_id": "surrender_charge_term_12",
+            "change_class": "approval_required",
+            "applied": False,
+            "changes": [{"path": "profit_test.surrender_charge_term", "value": 12}],
+            "reason": (
+                "Hard constraints were not met. Extending surrender_charge_term "
+                "requires approval and was not applied."
+            ),
+        },
+        {
+            "hypothesis_id": "surrender_charge_term_15",
+            "change_class": "approval_required",
+            "applied": False,
+            "changes": [{"path": "profit_test.surrender_charge_term", "value": 15}],
+            "reason": (
+                "Hard constraints were not met. Extending surrender_charge_term "
+                "requires approval and was not applied."
+            ),
+        },
+        {
+            "hypothesis_id": "irr_target_lower_1pp",
+            "change_class": "approval_required",
+            "applied": False,
+            "changes": [{"path": "optimization.irr_target", "value": lowered_target}],
+            "reason": (
+                "Hard constraints were not met. Lowering irr_target "
+                "requires approval and was not applied."
+            ),
+        },
+    )
 
 
 def _run_stage(  # 1ステージ分の探索を実行する
@@ -454,54 +482,19 @@ def optimize_loading_parameters(  # 係数探索のメイン関数
     config: dict,  # 設定
     base_dir: Path,  # 相対パス基準
 ) -> OptimizationResult:  # 最適化結果を返す
-    base_result = _optimize_once(config, base_dir)  # 通常探索を実行する
-    if base_result.success:  # 成功していればそのまま返す
+    """Search loading parameters on the given config.
+
+    Constraint relaxations (surrender charge term, IRR target, and similar)
+    are not applied. When the search misses hard constraints, unapplied
+    approval-required hypotheses are attached for the ledger.
+    """
+    base_result = _optimize_once(config, base_dir)  # 入力configのまま探索する
+    if base_result.success:  # 成功していれば仮説は付けない
         return base_result
-
-    settings = load_optimization_settings(config)  # ベース設定を取得する
-    proposals = [
-        {
-            "plan": "Plan A",
-            "changes": [{"path": "profit_test.surrender_charge_term", "value": 12}],
-            "justification": "Longer surrender charge improves early cashflow stability.",
-        },
-        {
-            "plan": "Plan A",
-            "changes": [{"path": "profit_test.surrender_charge_term", "value": 15}],
-            "justification": "Competitor analysis suggests longer surrender charge is acceptable.",
-        },
-        {
-            "plan": "Plan B",
-            "changes": [
-                {
-                    "path": "optimization.irr_target",
-                    "value": max(settings.irr_target - 0.01, 0.0),
-                }
-            ],
-            "justification": "Target IRR lowered to reflect current market conditions.",
-        },
-    ]
-
-    for proposal in proposals:  # ハック案を順に試す
-        hacked_config = copy.deepcopy(config)  # 元設定を保護する
-        for change in proposal["changes"]:
-            _apply_config_change(hacked_config, str(change["path"]), change["value"])
-        hacked_result = _optimize_once(hacked_config, base_dir)  # 再最適化を実行する
-        if hacked_result.success:  # 条件付き成功なら提案を付与して返す
-            proposal_payload = {
-                "plan": proposal["plan"],
-                "changes": proposal["changes"],
-                "justification": proposal["justification"],
-                "conditional_success": True,
-                "impact": {
-                    "min_irr": hacked_result.min_irr,
-                    "min_irr_model_point": hacked_result.min_irr_model_point,
-                    "success": hacked_result.success,
-                },
-            }
-            return replace(hacked_result, proposal=proposal_payload)
-
-    return base_result  # すべて失敗したら元の結果を返す
+    return replace(
+        base_result,
+        approval_hypotheses=_approval_required_hypotheses(config),
+    )
 
 
 def write_optimized_config(  # 最適化結果を設定ファイルとして保存する

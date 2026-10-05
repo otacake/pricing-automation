@@ -10,12 +10,13 @@ SRC_ROOT = REPO_ROOT / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
+from tests.data_paths import apply_fixture_inputs
 from pricing.report_feasibility import build_feasibility_report, report_feasibility_from_config
 from pricing.profit_test import model_point_label, run_profit_test
 
 
 def test_report_feasibility_writes_yaml(tmp_path: Path) -> None:
-    config_path = REPO_ROOT / "configs" / "trial-001.yaml"
+    config_path = REPO_ROOT / "configs" / "trial-001.synthetic.yaml"
     out_path = tmp_path / "feasibility_deck.yaml"
 
     result_path = report_feasibility_from_config(
@@ -46,7 +47,7 @@ def test_report_feasibility_writes_yaml(tmp_path: Path) -> None:
 
 def test_report_feasibility_sweep_row_count() -> None:
     config_path = REPO_ROOT / "configs" / "trial-001.yaml"
-    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    config = apply_fixture_inputs(yaml.safe_load(config_path.read_text(encoding="utf-8")))
     config["model_points"] = config["model_points"][:2]
 
     deck = build_feasibility_report(
@@ -65,7 +66,7 @@ def test_report_feasibility_sweep_row_count() -> None:
 
 def test_report_feasibility_supports_loading_parameters_only() -> None:
     config_path = REPO_ROOT / "configs" / "trial-001.optimized.yaml"
-    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    config = apply_fixture_inputs(yaml.safe_load(config_path.read_text(encoding="utf-8")))
     config.pop("loading_alpha_beta_gamma", None)
     config["model_points"] = config["model_points"][:2]
 
@@ -85,7 +86,7 @@ def test_report_feasibility_supports_loading_parameters_only() -> None:
 
 def test_report_feasibility_r_one_matches_run_base_premiums() -> None:
     config_path = REPO_ROOT / "configs" / "trial-001.executive.optimized.yaml"
-    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    config = apply_fixture_inputs(yaml.safe_load(config_path.read_text(encoding="utf-8")))
     config["model_points"] = config["model_points"][:2]
 
     deck = build_feasibility_report(

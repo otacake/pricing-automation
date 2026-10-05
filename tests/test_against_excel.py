@@ -148,6 +148,7 @@ def _sex_from_master(value: object) -> str:  # Excelの性別表現をmale/femal
     return "male"  # 不明な場合はmaleに寄せる
 
 
+@pytest.mark.real_data
 def test_endowment_against_excel() -> None:  # 保険料計算がExcelと一致するか検証する
     wb = _load_workbook_or_skip()  # Excelを読み込む
     try:  # 読み込み後の処理を実行する
@@ -197,6 +198,7 @@ def test_endowment_against_excel() -> None:  # 保険料計算がExcelと一致�
         wb.close()  # ワークブックを閉じる
 
 
+@pytest.mark.real_data
 def test_profit_test_against_excel() -> None:  # 収益性検証がExcelと一致するか検証する
     wb = _load_workbook_or_skip()  # Excelを読み込む
     try:  # 読み込み後の処理を実行する

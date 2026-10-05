@@ -1,6 +1,17 @@
 gate:
   max_violation_count: 0
 
+loop:
+  max_iterations: 3
+  random_seed: 20261005
+
+acceptance:
+  objective: maximize_min_irr
+  tie_break: lower_premium
+
+ledger:
+  path: out/pdca_ledger.jsonl
+
 feasibility:
   enabled: true
   r_start: 1.0

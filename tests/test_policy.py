@@ -36,6 +36,11 @@ def test_load_auto_cycle_policy_defaults(tmp_path: Path) -> None:
     assert policy.reporting.explainability.procon_qual_count == 3
     assert policy.reporting.explainability.require_causal_bridge is True
     assert policy.reporting.explainability.require_sensitivity_decomp is True
+    assert policy.loop.max_iterations == 3
+    assert policy.loop.random_seed == 20261005
+    assert policy.acceptance.objective == "maximize_min_irr"
+    assert policy.acceptance.tie_break == "lower_premium"
+    assert policy.ledger.path == "out/pdca_ledger.jsonl"
 
 
 def test_repo_policy_file_is_loadable() -> None:
@@ -45,6 +50,8 @@ def test_repo_policy_file_is_loadable() -> None:
     assert policy.reporting.chart_language in ("ja", "en")
     assert policy.reporting.pptx_theme == "consulting-clean-v2"
     assert policy.reporting.decision_compare.counter_objective
+    assert policy.loop.max_iterations >= 1
+    assert policy.acceptance.objective == "maximize_min_irr"
 
 
 def test_load_auto_cycle_policy_rejects_legacy_engine(tmp_path: Path) -> None:

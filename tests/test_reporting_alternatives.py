@@ -10,25 +10,16 @@ SRC_ROOT = REPO_ROOT / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
+from tests.data_paths import apply_fixture_inputs
 from pricing.diagnostics import build_execution_context
 from pricing.reporting.alternatives import build_decision_alternatives
 
 
 def _small_config() -> dict:
-    source = REPO_ROOT / "configs" / "trial-001.yaml"
+    source = REPO_ROOT / "configs" / "trial-001.synthetic.yaml"
     config = yaml.safe_load(source.read_text(encoding="utf-8"))
     config["model_points"] = config["model_points"][:1]
-
-    config["pricing"]["mortality_path"] = str((REPO_ROOT / "data" / "mortality_pricing.csv").resolve())
-    config["profit_test"]["mortality_actual_path"] = str(
-        (REPO_ROOT / "data" / "mortality_actual.csv").resolve()
-    )
-    config["profit_test"]["discount_curve_path"] = str(
-        (REPO_ROOT / "data" / "spot_curve_actual.csv").resolve()
-    )
-    config["profit_test"]["expense_model"]["company_data_path"] = str(
-        (REPO_ROOT / "data" / "company_expense.csv").resolve()
-    )
+    apply_fixture_inputs(config)
 
     optimization = config.setdefault("optimization", {})
     optimization["max_iterations_per_stage"] = 3

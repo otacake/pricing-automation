@@ -13,7 +13,10 @@ import yaml  # YAML設定を読み込むため
 
 from .config import load_optimization_settings, loading_surplus_threshold, read_loading_parameters  # 設定値の解釈に使うため
 from .diagnostics import build_execution_context, build_run_summary  # 構造化診断に使うため
+from .data_quality import validate_input_data
+from .ledger import record_approval_hypotheses, stable_config_sha256
 from .optimize import optimize_loading_parameters, write_optimized_config  # 最適化の実行と結果保存に使うため
+from .pdca_loop import run_pdca_loop
 from .outputs import (  # 出力ファイル生成に使うため
     write_optimize_log,
     write_profit_test_excel,
@@ -224,6 +227,16 @@ def optimize_from_config(config_path: Path) -> int:  # YAML設定を使って最
     _validate_config_or_exit(config, context="pricing.cli optimize")
     base_dir = resolve_base_dir_from_config(config_path)  # 相対パス解決の基準ディレクトリを取得する
     result = optimize_loading_parameters(config, base_dir=base_dir)  # 最適化を実行する
+    if result.approval_hypotheses:
+        record_approval_hypotheses(
+            base_dir / "out" / "pdca_ledger.jsonl",
+            result.approval_hypotheses,
+            loop_id="optimize",
+            source="optimize",
+            iteration=0,
+            seed=None,
+            config_sha256=stable_config_sha256(config),
+        )
 
     outputs_cfg = config.get("outputs", {})  # 出力設定を取得する
     log_path = _resolve_output_path(base_dir, outputs_cfg.get("log_path"), "out/result.log")
@@ -404,6 +417,49 @@ def sweep_ptm_from_config(  # premium-to-maturityスイープをYAML設定から
     return 0  # 正常終了コードを返す
 
 
+def validate_data_from_config(config_path: Path) -> int:
+    """Gate A: required columns, types/units, model-point identity, and expenses."""
+    config_path = config_path.expanduser().resolve()
+    config = _load_config(config_path)
+    base_dir = resolve_base_dir_from_config(config_path)
+    issues = validate_config(config)
+    issues.extend(validate_input_data(config, base_dir))
+    for line in format_validation_issues(issues, prefix="validate_data"):
+        print(line)
+    if has_validation_errors(issues):
+        print("validate_data: failed")
+        return 1
+    print("validate_data: ok")
+    return 0
+
+
+def pdca_loop_from_config(
+    config_path: Path,
+    *,
+    policy_path: Path,
+    max_iterations: int | None,
+) -> int:
+    try:
+        outputs = run_pdca_loop(
+            config_path,
+            policy_path=policy_path,
+            max_iterations=max_iterations,
+        )
+    except RuntimeError as exc:
+        print(str(exc))
+        return 1
+    print("pdca_loop")
+    print(f"loop_id: {outputs.loop_id}")
+    print(f"status: {outputs.status}")
+    print(f"stop_reason: {outputs.stop_reason}")
+    print(f"iterations_run: {outputs.iterations_run}")
+    print(f"champion_metrics: {outputs.champion_metrics}")
+    print(f"wrote_manifest: {outputs.manifest_path}")
+    print(f"wrote_result_log: {outputs.result_log_path}")
+    print(f"wrote_ledger: {outputs.ledger_path}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:  # CLIのメイン処理を実装する
     parser = argparse.ArgumentParser(description="Pricing automation CLI.")  # CLI全体の説明を設定する
     subparsers = parser.add_subparsers(dest="command", required=True)  # サブコマンドを必須化する
@@ -576,6 +632,30 @@ def main(argv: list[str] | None = None) -> int:  # CLIのメイン処理を実�
     )
     propose_parser.add_argument("--reason", type=str, required=True)
     propose_parser.add_argument("--out", type=str, default="out/propose_change.json")
+
+    validate_parser = subparsers.add_parser(
+        "validate-data",
+        help="Gate A data-quality check for config inputs.",
+    )
+    validate_parser.add_argument("config", type=str, help="Path to config YAML.")
+
+    loop_parser = subparsers.add_parser(
+        "pdca-loop",
+        help="Run a champion/challenger PDCA loop with a no-regression guard.",
+    )
+    loop_parser.add_argument("config", type=str, help="Path to config YAML.")
+    loop_parser.add_argument(
+        "--policy",
+        type=str,
+        default="policy/pricing_policy.yaml",
+        help="Path to auto cycle policy YAML.",
+    )
+    loop_parser.add_argument(
+        "--max-iterations",
+        type=int,
+        default=None,
+        help="Override policy loop.max_iterations.",
+    )
     args = parser.parse_args(argv)  # CLI引数を解析する
     if args.command == "run":  # runコマンドの場合
         return run_from_config(Path(args.config))  # run処理を実行する
@@ -654,12 +734,24 @@ def main(argv: list[str] | None = None) -> int:  # CLIのメイン処理を実�
         if outputs.decision_compare_path is not None:
             print(f"wrote_compare: {outputs.decision_compare_path}")
         return 0
-    if args.command == "run-cycle":
-        outputs = run_pdca_cycle(
+    if args.command == "validate-data":
+        return validate_data_from_config(Path(args.config))
+    if args.command == "pdca-loop":
+        return pdca_loop_from_config(
             Path(args.config),
             policy_path=Path(args.policy),
-            skip_tests=bool(args.skip_tests),
+            max_iterations=None if args.max_iterations is None else int(args.max_iterations),
         )
+    if args.command == "run-cycle":
+        try:
+            outputs = run_pdca_cycle(
+                Path(args.config),
+                policy_path=Path(args.policy),
+                skip_tests=bool(args.skip_tests),
+            )
+        except RuntimeError as exc:
+            print(str(exc))
+            return 1
         print(f"run_id: {outputs.run_id}")
         print(f"wrote_manifest: {outputs.manifest_path}")
         print(f"wrote_baseline_summary: {outputs.baseline_summary_path}")
